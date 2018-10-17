@@ -1,6 +1,6 @@
-use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU};
+use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU, ModbusClient};
 
-#[Derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ChargeState {
     UnknownState(u16),
     Start,
@@ -19,24 +19,24 @@ pub enum ChargeState {
 impl From<u16> for ChargeState {
     fn from(i: u16) -> Self {
         match i {
-            0u16 -> ChargeState::Start,
-            1u16 -> ChargeState::NightCheck,
-            2u16 -> ChargeState::Disconnect,
-            3u16 -> ChargeState::Night,
-            4u16 -> ChargeState::Fault,
-            5u16 -> ChargeState::BulkMPPT,
-            6u16 -> ChargeState::Absorption,
-            7u16 -> ChargeState::Float,
-            8u16 -> ChargeState::Equalize,
-            9u16 -> ChargeState::Slave,
-            10u16 -> ChargeState::Fixed,
-            i -> ChargeState::UnknownState(i)
+            0u16 => ChargeState::Start,
+            1u16 => ChargeState::NightCheck,
+            2u16 => ChargeState::Disconnect,
+            3u16 => ChargeState::Night,
+            4u16 => ChargeState::Fault,
+            5u16 => ChargeState::BulkMPPT,
+            6u16 => ChargeState::Absorption,
+            7u16 => ChargeState::Float,
+            8u16 => ChargeState::Equalize,
+            9u16 => ChargeState::Slave,
+            10u16 => ChargeState::Fixed,
+            i => ChargeState::UnknownState(i)
         }
     }
 }
 
 bitflags! {
-    #[Derive(Default)]
+    #[derive(Default)]
     pub struct ArrayFaults: u16 {
         const Overcurrent                = 0x0001;
         const MOSFETShorted              = 0x0002;
@@ -55,8 +55,10 @@ bitflags! {
         const Fault15                    = 0x4000;
         const Fault16                    = 0x8000;
     }
+}
 
-    #[Derive(Default)]
+bitflags! {
+    #[derive(Default)]
     pub struct LoadFaults: u16 {
         const ExternalShortCircuit = 0x0001;
         const Overcurrent          = 0x0002;
@@ -67,8 +69,10 @@ bitflags! {
         const DipSwitchChanged     = 0x0040;
         const CustomSettingsEdit   = 0x0080;
     }
-
-    #[Derive(Default)]
+}
+    
+bitflags! {
+    #[derive(Default)]
     pub struct Alarms: u32 {
         const RTSOpen                   = 0x00000001;
         const RTSShorted                = 0x00000002;
@@ -100,7 +104,7 @@ bitflags! {
     }
 }
 
-#[Derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum LoadState {
     Unknown(u16),
     Start,
@@ -117,21 +121,21 @@ pub enum LoadState {
 impl From<u16> for LoadState {
     fn from(i: u16) -> LoadState {
         match i {
-            0u16 -> LoadState::Start,
-            1u16 -> LoadState::Normal,
-            2u16 -> LoadState::LVDWarning,
-            3u16 -> LoadState::LVD,
-            4u16 -> LoadState::Fault,
-            5u16 -> LoadState::Disconnect,
-            6u16 -> LoadState::NormalOff,
-            7u16 -> LoadState::Override,
-            8u16 -> LoadState::NotUsed,
-            i -> LoadState::Unknown(i)
+            0u16 => LoadState::Start,
+            1u16 => LoadState::Normal,
+            2u16 => LoadState::LVDWarning,
+            3u16 => LoadState::LVD,
+            4u16 => LoadState::Fault,
+            5u16 => LoadState::Disconnect,
+            6u16 => LoadState::NormalOff,
+            7u16 => LoadState::Override,
+            8u16 => LoadState::NotUsed,
+            i => LoadState::Unknown(i)
         }
     }
 }
 
-#[Derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Stats {
     battery_terminal_voltage: f32,
     array_voltage: f32,
@@ -173,7 +177,7 @@ pub struct Stats {
     ah_load_daily: f32,
     array_faults_daily: ArrayFaults,
     load_faults_daily: LoadFaults,
-    alarms_daily: AlarmsDaily,
+    alarms_daily: Alarms,
     array_voltage_max_daily: f32,
     array_voltage_fixed: f32,
     array_voc_percent_fixed: f32    
@@ -183,19 +187,19 @@ pub struct Con(Modbus);
 
 impl Con {
     pub fn connect(device: &str, slave: u8) -> Result<Con, Error> {
-        let con = Modbus::new_rtu(device, 9600, 'N', 8, 2)?;
+        let mut con = Modbus::new_rtu(device, 9600, 'N', 8, 2)?;
         con.set_slave(slave)?;
         con.connect()?;
-        Con(con)
+        Ok(Con(con))
     }
 
     pub fn stats(&self) -> Result<Stats, Error> {
         fn volts(n: u16) -> f32 { n as f32 * 0.0030517578125 }
         fn amps(n: u16) -> f32 { n as f32 * 0.002415771484375 }
-        fn ah(n1: u16, n2: u16) -> f32 { (n1 as u32 << 16 | n2 as u32) as f32 * 0.1 }
+        fn ah(n1: u16, n2: u16) -> f32 { ((n1 as u32) << 16 | n2 as u32) as f32 * 0.1 }
         fn watts(n: u16) -> f32 { n as f32 * 0.01509857177734375 }
         let base = 0x0008;
-        let mut raw = [u16; 72];
+        let mut raw = [0u16; 72];
         self.0.read_registers(0x0008, 72, &mut raw)?;
         Ok(Stats {
             battery_terminal_voltage: volts(raw[0x0012 - base]),
@@ -226,22 +230,22 @@ impl Con {
             lvd_setpoint:  volts(raw[0x0030 - base]),
             ah_load_resettable: ah(raw[0x0032 - base], raw[0x0033 - base]),
             ah_load_total: ah(raw[0x0034 - base], raw[0x0035 - base]),
-            hourmeter: (raw[0x0036 - base] as u32 << 16 | raw[0x0037 - base] as u32) as f32,
-            alarms: Alarms::from_bits_truncate(raw[0x0038 - base] as u32 << 16 | raw[0x0039 - base] as u32),
+            hourmeter: ((raw[0x0036 - base] as u32) << 16 | raw[0x0037 - base] as u32) as f32,
+            alarms: Alarms::from_bits_truncate((raw[0x0038 - base] as u32) << 16 | raw[0x0039 - base] as u32),
             array_power: watts(raw[0x003C - base]),
             array_vmp: volts(raw[0x003D - base]),
             array_max_power_sweep: watts(raw[0x003E - base]),
             array_voc: volts(raw[0x003F - base]),
             battery_v_min_daily: volts(raw[0x0041 - base]),
             battery_v_max_daily: volts(raw[0x0042 - base]),
-            ah_charge_daily: ah(raw[0x0043 - base]),
-            ah_load_daily: ah(raw[0x0044 - base]),
+            ah_charge_daily: raw[0x0043 - base] as f32,
+            ah_load_daily: raw[0x0044 - base] as f32,
             array_faults_daily: ArrayFaults::from_bits_truncate(raw[0x0045 - base]),
             load_faults_daily: LoadFaults::from_bits_truncate(raw[0x0046 - base]),
-            alarms_daily: Alarms::from_bits_truncate(raw[0x0047 - base] as u32 << 16 | raw[0x0048 - base] as u32),
+            alarms_daily: Alarms::from_bits_truncate((raw[0x0047 - base] as u32) << 16 | raw[0x0048 - base] as u32),
             array_voltage_max_daily: volts(raw[0x004C - base]),
             array_voltage_fixed: volts(raw[0x004F - base]),
-            array_voltage_percent_fixed: volts(raw[0x0050 - base])
+            array_voc_percent_fixed: volts(raw[0x0050 - base])
         })
     }
 }
