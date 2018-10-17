@@ -7,3 +7,4 @@ authors = ["eric"]
 error-chain="0.12"
 libmodbus-rs="0.8"
 bitflags="1.0"
+half = "1.3"
