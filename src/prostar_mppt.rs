@@ -1,5 +1,6 @@
 use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU};
 
+#[Derive(Debug, Clone, Copy)]
 pub enum ChargeState {
     UnknownState(u16),
     Start,
@@ -99,6 +100,7 @@ bitflags! {
     }
 }
 
+#[Derive(Debug, Clone, Copy)]
 pub enum LoadState {
     Unknown(u16),
     Start,
@@ -129,6 +131,7 @@ impl From<u16> for LoadState {
     }
 }
 
+#[Derive(Debug, Clone, Copy)]
 pub struct Stats {
     battery_terminal_voltage: f32,
     array_voltage: f32,
@@ -155,14 +158,14 @@ pub struct Stats {
     kwh_charge_total: f32,
     load_state: LoadState,
     load_faults: LoadFaults,
-    lvd_setpoint_current_compensated: f32,
+    lvd_setpoint: f32,
     ah_load_resettable: f32,
     ah_load_total: f32,
     hourmeter: f32,
     alarms: Alarms,
     array_power: f32,
     array_vmp: f32,
-    array_max_power_sweet: f32,
+    array_max_power_sweep: f32,
     array_voc: f32,
     battery_v_min_daily: f32,
     battery_v_max_daily: f32,
@@ -179,20 +182,66 @@ pub struct Stats {
 pub struct Con(Modbus);
 
 impl Con {
-    fn connect(device: &str, slave: u8) -> Result<Con, Error> {
+    pub fn connect(device: &str, slave: u8) -> Result<Con, Error> {
         let con = Modbus::new_rtu(device, 9600, 'N', 8, 2)?;
         con.set_slave(slave)?;
         con.connect()?;
         Con(con)
     }
 
-    fn stats(&self) -> Result<Stats, Error> {
+    pub fn stats(&self) -> Result<Stats, Error> {
+        fn volts(n: u16) -> f32 { n as f32 * 0.0030517578125 }
+        fn amps(n: u16) -> f32 { n as f32 * 0.002415771484375 }
+        fn ah(n1: u16, n2: u16) -> f32 { (n1 as u32 << 16 | n2 as u32) as f32 * 0.1 }
+        fn watts(n: u16) -> f32 { n as f32 * 0.01509857177734375 }
         let base = 0x0008;
         let mut raw = [u16; 72];
         self.0.read_registers(0x0008, 72, &mut raw)?;
-        Stats {
-            battery_terminal_voltage: raw[0x0012 - base] as f32,
-            
-        }
+        Ok(Stats {
+            battery_terminal_voltage: volts(raw[0x0012 - base]),
+            array_voltage: volts(raw[0x0013 - base]),
+            load_voltage: volts(raw[0x0014 - base]),
+            charge_current: amps(raw[0x0010 - base]),
+            load_current: amps(raw[0x0016 - base]),
+            battery_current_net: amps(raw[0x0015 - base]),
+            battery_sense_voltage: volts(raw[0x0017 - base]),
+            meterbus_voltage: volts(raw[0x0008 - base]),
+            heatsink_temperature: raw[0x001A - base] as f32,
+            battery_temperature: raw[0x001B - base] as f32,
+            ambient_temperature: raw[0x001C - base] as f32,
+            rts_temperature: raw[0x001D - base] as f32,
+            u_inductor_temperature: raw[0x001E - base] as f32,
+            v_inductor_temperature: raw[0x001F - base] as f32,
+            w_inductor_temperature: raw[0x0020 - base] as f32,
+            charge_state: ChargeState::from(raw[0x0021 - base]),
+            array_faults: ArrayFaults::from_bits_truncate(raw[0x0022 - base]),
+            battery_voltage_slow: volts(raw[0x0023 - base]),
+            target_voltage: volts(raw[0x0024 - base]),
+            ah_charge_resettable: ah(raw[0x0026 - base], raw[0x0027 - base]),
+            ah_charge_total: ah(raw[0x0028 - base], raw[0x0029 - base]),
+            kwh_charge_resettable: raw[0x002A - base] as f32,
+            kwh_charge_total: raw[0x002B - base] as f32,
+            load_state: LoadState::from(raw[0x002E - base]),
+            load_faults: LoadFaults::from_bits_truncate(raw[0x002F - base]),
+            lvd_setpoint:  volts(raw[0x0030 - base]),
+            ah_load_resettable: ah(raw[0x0032 - base], raw[0x0033 - base]),
+            ah_load_total: ah(raw[0x0034 - base], raw[0x0035 - base]),
+            hourmeter: (raw[0x0036 - base] as u32 << 16 | raw[0x0037 - base] as u32) as f32,
+            alarms: Alarms::from_bits_truncate(raw[0x0038 - base] as u32 << 16 | raw[0x0039 - base] as u32),
+            array_power: watts(raw[0x003C - base]),
+            array_vmp: volts(raw[0x003D - base]),
+            array_max_power_sweep: watts(raw[0x003E - base]),
+            array_voc: volts(raw[0x003F - base]),
+            battery_v_min_daily: volts(raw[0x0041 - base]),
+            battery_v_max_daily: volts(raw[0x0042 - base]),
+            ah_charge_daily: ah(raw[0x0043 - base]),
+            ah_load_daily: ah(raw[0x0044 - base]),
+            array_faults_daily: ArrayFaults::from_bits_truncate(raw[0x0045 - base]),
+            load_faults_daily: LoadFaults::from_bits_truncate(raw[0x0046 - base]),
+            alarms_daily: Alarms::from_bits_truncate(raw[0x0047 - base] as u32 << 16 | raw[0x0048 - base] as u32),
+            array_voltage_max_daily: volts(raw[0x004C - base]),
+            array_voltage_fixed: volts(raw[0x004F - base]),
+            array_voltage_percent_fixed: volts(raw[0x0050 - base])
+        })
     }
 }
