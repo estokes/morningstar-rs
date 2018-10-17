@@ -1,0 +1,9 @@
+[package]
+name = "morningstar"
+version = "0.1.0"
+authors = ["eric"]
+
+[dependencies]
+error-chain="0.12"
+libmodbus-rs="0.8"
+bitflags="1.0"
