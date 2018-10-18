@@ -207,7 +207,7 @@ impl Con {
     pub fn stats(&self) -> Result<Stats, Error> {
         let mut raw = [0u16; 81];
         self.0.read_registers(0x0, 80, &mut raw)?;
-        fn gdf32(h: u16, l: u16) -> f32 { f32::from_bits((h as u32) << 16 | (l as u32)) }
+        fn gu32(h: u16, l: u16) -> u32 { (h as u32) << 16 | (l as u32) }
         fn gf32(u: u16) -> f32 { f16::from_bits(u).to_f32() }
         fn v(u: f32) -> ElectricPotential { ElectricPotential::new::<volt>(u) }
         fn a(u: f32) -> ElectricCurrent { ElectricCurrent::new::<ampere>(u) }
@@ -236,16 +236,16 @@ impl Con {
             array_faults: ArrayFaults::from_bits_truncate(raw[0x0022]),
             battery_voltage_slow: v(gf32(raw[0x0023])),
             target_voltage: v(gf32(raw[0x0024])),
-            ah_charge_resettable: ah(gdf32(raw[0x0026], raw[0x0027])),
-            ah_charge_total: ah(gdf32(raw[0x0028], raw[0x0029])),
+            ah_charge_resettable: ah(gu32(raw[0x0026], raw[0x0027]) as f32 * 0.1),
+            ah_charge_total: ah(gu32(raw[0x0028], raw[0x0029]) as f32 * 0.1),
             kwh_charge_resettable: kwh(gf32(raw[0x002A]) * 0.1),
             kwh_charge_total: kwh(gf32(raw[0x002B]) * 0.1),
             load_state: LoadState::from(raw[0x002E]),
             load_faults: LoadFaults::from_bits_truncate(raw[0x002F]),
             lvd_setpoint: v(gf32(raw[0x0030])),
-            ah_load_resettable: ah(gdf32(raw[0x0032], raw[0x0033])),
-            ah_load_total: ah(gdf32(raw[0x0034], raw[0x0035])),
-            hourmeter: hr(gdf32(raw[0x0036], raw[0x0037])),
+            ah_load_resettable: ah(gu32(raw[0x0032], raw[0x0033]) as f32 * 0.1),
+            ah_load_total: ah(gu32(raw[0x0034], raw[0x0035]) as f32 * 0.1),
+            hourmeter: hr(gu32(raw[0x0036], raw[0x0037]) as f32),
             alarms: Alarms::from_bits_truncate((raw[0x0038] as u32) << 16 | raw[0x0039] as u32),
             array_power: w(gf32(raw[0x003C])),
             array_vmp: v(gf32(raw[0x003D])),
