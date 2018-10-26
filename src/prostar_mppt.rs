@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU, ModbusClient};
 use half::f16;
 use uom::si::{
@@ -11,7 +12,7 @@ use uom::si::{
     time::hour
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChargeState {
     UnknownState(u16),
     Start,
@@ -47,7 +48,7 @@ impl From<u16> for ChargeState {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Serialize, Deserialize)]
     pub struct ArrayFaults: u16 {
         const Overcurrent                = 0x0001;
         const MOSFETShorted              = 0x0002;
@@ -69,7 +70,7 @@ bitflags! {
 }
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Serialize, Deserialize)]
     pub struct LoadFaults: u16 {
         const ExternalShortCircuit = 0x0001;
         const Overcurrent          = 0x0002;
@@ -83,7 +84,7 @@ bitflags! {
 }
     
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Serialize, Deserialize)]
     pub struct Alarms: u32 {
         const RTSOpen                   = 0x00000001;
         const RTSShorted                = 0x00000002;
@@ -115,7 +116,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum LoadState {
     Unknown(u16),
     Start,
@@ -146,8 +147,15 @@ impl From<u16> for LoadState {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Stats {
+    timestamp: DateTime<Local>,
+    software_version: u16,
+    battery_voltage_settings_multiplier: u16,
+    supply_3v3: ElectricPotential,
+    supply_12v: ElectricPotential,
+    supply_5v: ElectricPotential,
+    gate_drive_voltage: ElectricPotential,
     battery_terminal_voltage: ElectricPotential,
     array_voltage: ElectricPotential,
     load_voltage: ElectricPotential,
@@ -194,6 +202,45 @@ pub struct Stats {
     array_voc_percent_fixed: f32,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum Coil {
+    EqualizeTriggered,
+    LoadDisconnect,
+    ChargeDisconnect,
+    ClearAhResettable,
+    ClearAhTotal,
+    ClearKwhResettable,
+    ClearFaults,
+    ClearAlarms,
+    ForceEEPROMUpdate,
+    ClearKwhTotal,
+    ClearVbMinMax,
+    LightingModeTest,
+    FactoryReset,
+    ResetControl
+}
+
+impl Coil {
+    fn address(&self) -> u16 {
+        match self {
+            Coil::EqualizeTriggered  => 0x0000,
+            Coil::LoadDisconnect     => 0x0001,
+            Coil::ChargeDisconnect   => 0x0002,
+            Coil::ClearAhResettable  => 0x0010,
+            Coil::ClearAhTotal       => 0x0011,
+            Coil::ClearKwhResettable => 0x0012,
+            Coil::ClearFaults        => 0x0014,
+            Coil::ClearAlarms        => 0x0015,
+            Coil::ForceEEPROMUpdate  => 0x0016,
+            Coil::ClearKwhTotal      => 0x0018,
+            Coil::ClearVbMinMax      => 0x0019,
+            Coil::LightingModeTest   => 0x0020,
+            Coil::FactoryReset       => 0x00FE,
+            Coil::ResetControl       => 0x00FF
+        }
+    }
+}
+
 pub struct Con(Modbus);
 
 impl Con {
@@ -202,6 +249,16 @@ impl Con {
         con.set_slave(slave)?;
         con.connect()?;
         Ok(Con(con))
+    }
+
+    pub fn read_coil(&self, coil: Coil) -> Result<bool, Error> {
+        let mut raw = [0u8; 1];
+        self.0.read_bits(coil.address(), 1, &mut raw)?;
+        Ok(if raw[0] == 0 { false } else { true })
+    }
+
+    pub fn write_coil(&self, coil: Coil, val: bool) -> Result<(), Error> {
+        self.0.write_bit(coil.address(), val)
     }
 
     pub fn stats(&self) -> Result<Stats, Error> {
@@ -217,6 +274,13 @@ impl Con {
         fn kwh(u: f32) -> Energy { Energy::new::<kilowatt_hour>(u) }
         fn hr(u: f32) -> Time { Time::new::<hour>(u) }
         Ok(Stats {
+            timestamp: Local::now(),
+            software_version: raw[0x0000],
+            battery_voltage_settings_multiplier: raw[0x0001],
+            supply_3v3: v(gf32(raw[0x0004])),
+            supply_12v: v(gf32(raw[0x0005])),
+            supply_5v: v(gf32(raw[0x0006])),
+            gate_drive_voltage: v(gf32(raw[0x0007])),
             battery_terminal_voltage: v(gf32(raw[0x0012])),
             array_voltage: v(gf32(raw[0x0013])),
             load_voltage: v(gf32(raw[0x0014])),

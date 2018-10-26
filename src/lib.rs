@@ -3,5 +3,9 @@ extern crate libmodbus_rs;
 extern crate bitflags;
 extern crate half;
 extern crate uom;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate chrono;
 
 pub mod prostar_mppt;
