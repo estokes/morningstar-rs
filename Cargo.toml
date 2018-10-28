@@ -10,7 +10,6 @@ documentation = "https://docs.rs/morningstar"
 repository = "https://github.com/estokes/morningstar-rs"
 
 [dependencies]
-error-chain = "0.12"
 libmodbus-rs = "0.8"
 bitflags = "1.0"
 half = "1.3"
