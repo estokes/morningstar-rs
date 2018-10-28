@@ -1,3 +1,7 @@
+/** 
+Interface with the Prostar MPPT (all models) as documented at
+http://support.morningstarcorp.com/wp-content/uploads/2015/12/PSMPPT_public-MODBUS-doc_v04.pdf
+*/
 use chrono::prelude::*;
 use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU, ModbusClient};
 use half::f16;
