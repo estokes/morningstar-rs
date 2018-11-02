@@ -17,4 +17,4 @@ uom = { version = "0.20", features = ["use_serde", "f32", "f64", "si", "std"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
-error_chain = "0.12"
+error-chain = "0.12"

@@ -2,8 +2,7 @@
 Interface with the Prostar MPPT (all models) as documented at
 http://support.morningstarcorp.com/wp-content/uploads/2015/12/PSMPPT_public-MODBUS-doc_v04.pdf
 */
-use chrono::prelude::*;
-use libmodbus_rs::{prelude::Error, Modbus, ModbusRTU, ModbusClient};
+use libmodbus_rs::{Modbus, ModbusRTU, ModbusClient};
 use half::f16;
 use uom::si::{
     f32::*,
@@ -25,11 +24,11 @@ fn a(u: f32) -> ElectricCurrent { ElectricCurrent::new::<ampere>(u) }
 fn ah(u: f32) -> ElectricCharge { ElectricCharge::new::<ampere_hour>(u) }
 fn c(u: f32) -> ThermodynamicTemperature { ThermodynamicTemperature::new::<degree_celsius>(u) }
 fn w(u: f32) -> Power { Power::new::<watt>(u) }
-fn ohm(u: f32) -> ElectricalResistance { ElectricalResistance::new::<ohm>(u) }
+fn om(u: f32) -> ElectricalResistance { ElectricalResistance::new::<ohm>(u) }
 fn kwh(u: f32) -> Energy { Energy::new::<kilowatt_hour>(u) }
 fn hr(u: f32) -> Time { Time::new::<hour>(u) }
 fn sec(u: f32) -> Time { Time::new::<second>(u) }
-fn day(u: f32) -> Time { Time::new::<day>(u) }
+fn dy(u: f32) -> Time { Time::new::<day>(u) }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChargeState {
@@ -177,7 +176,6 @@ impl From<u16> for LoadState {
 /** Charge controller statistics */
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Stats {
-    pub timestamp: DateTime<Local>,
     pub software_version: u16,
     pub battery_voltage_settings_multiplier: u16,
     pub supply_3v3: ElectricPotential,
@@ -237,7 +235,7 @@ pub struct Settings {
     pub float_voltage: ElectricPotential,
     pub time_before_float: Time,
     pub time_before_float_low_battery: Time,
-    pub float_low_battery_voltage_trigger: ElecticPotential,
+    pub float_low_battery_voltage_trigger: ElectricPotential,
     pub float_cancel_voltage: ElectricPotential,
     pub exit_float_time: Time,
     pub equalize_voltage: ElectricPotential,
@@ -270,9 +268,9 @@ pub struct Settings {
     pub charge_current_limit: ElectricCurrent
 }
 
-macro_rules! validate! {
-    ($field:ident, $unit:ident, $min:expr, $max:expr) => {
-        if self.$field < $unit($min) || self.field > $unit($max) {
+macro_rules! validate {
+    ($o:ident, $field:ident, $unit:ident, $min:expr, $max:expr) => {
+        if $o.$field < $unit($min) || $o.$field > $unit($max) {
             bail!("{} {} <= x <= {}", stringify!($field), $min, $max)
         }
     }
@@ -280,46 +278,46 @@ macro_rules! validate! {
 
 impl Settings {
     pub fn validate(&self) -> Result<()> {
-        validate!(regulation_voltage, v, 0, 15);
-        validate!(float_voltage, v, 0, 15);
-        validate!(time_before_float, sec, 0, 65535);
-        validate!(time_before_float_low_battery, sec, 0, 65535);
-        validate!(float_low_battery_voltage_trigger, v, 0, 15);
-        validate!(float_cancel_voltage, v, 0, 15);
-        validate!(exit_float_time, sec, 0, 65535);
-        validate!(equalize_voltage, v, 0, 15);
-        validate!(days_between_equalize_cycles, day, 0, 255);
-        validate!(equalize_time_limit_above_regulation_voltage, sec, 0, 65535);
-        validate!(equalize_time_limit_at_regulation_voltage, sec, 0, 65535);
-        validate!(reference_charge_voltage_limit, v, 0, 15);
-        validate!(battery_charge_current_limit, a, 0, 40);
-        validate!(temperature_compensation_coefficent, v, 0, 15);
-        validate!(high_voltage_disconnect, v, 0, 15);
-        validate!(high_voltage_reconnect, v, 0, 15);
-        validate!(maximum_charge_voltage_reference, v, 0, 15);
-        validate!(max_battery_temp_compensation_limit, c, -128, 127);
-        validate!(min_battery_temp_compensation_limit, c, -128, 127);
-        validate!(load_low_voltage_disconnect, v, 0, 15);
-        validate!(load_low_voltage_reconnect, v, 0, 15);
-        validate!(load_high_voltage_disconnect, v, 0, 15);
-        validate!(load_high_voltage_reconnect, v, 0, 15);
-        validate!(lvd_load_current_compensation, ohm, 0, 10000);
-        validate!(lvd_warning_timeout, sec, 0, 65535);
-        validate!(led_green_to_green_and_yellow_limit, v, 0, 15);
-        validate!(led_green_and_yellow_to_yellow_limit, v, 0, 15);
-        validate!(led_yellow_to_yellow_and_red_limit, v, 0, 15);
-        validate!(led_yellow_and_red_to_red_flashing_limit, v, 0, 15);
+        validate!(self, regulation_voltage, v, 0., 15.);
+        validate!(self, float_voltage, v, 0., 15.);
+        validate!(self, time_before_float, sec, 0., 65535.);
+        validate!(self, time_before_float_low_battery, sec, 0., 65535.);
+        validate!(self, float_low_battery_voltage_trigger, v, 0., 15.);
+        validate!(self, float_cancel_voltage, v, 0., 15.);
+        validate!(self, exit_float_time, sec, 0., 65535.);
+        validate!(self, equalize_voltage, v, 0., 15.);
+        validate!(self, days_between_equalize_cycles, dy, 0., 255.);
+        validate!(self, equalize_time_limit_above_regulation_voltage, sec, 0., 65535.);
+        validate!(self, equalize_time_limit_at_regulation_voltage, sec, 0., 65535.);
+        validate!(self, reference_charge_voltage_limit, v, 0., 15.);
+        validate!(self, battery_charge_current_limit, a, 0., 40.);
+        validate!(self, temperature_compensation_coefficent, v, 0., 15.);
+        validate!(self, high_voltage_disconnect, v, 0., 15.);
+        validate!(self, high_voltage_reconnect, v, 0., 15.);
+        validate!(self, maximum_charge_voltage_reference, v, 0., 15.);
+        validate!(self, max_battery_temp_compensation_limit, c, -128., 127.);
+        validate!(self, min_battery_temp_compensation_limit, c, -128., 127.);
+        validate!(self, load_low_voltage_disconnect, v, 0., 15.);
+        validate!(self, load_low_voltage_reconnect, v, 0., 15.);
+        validate!(self, load_high_voltage_disconnect, v, 0., 15.);
+        validate!(self, load_high_voltage_reconnect, v, 0., 15.);
+        validate!(self, lvd_load_current_compensation, om, 0., 10000.);
+        validate!(self, lvd_warning_timeout, sec, 0., 65535.);
+        validate!(self, led_green_to_green_and_yellow_limit, v, 0., 15.);
+        validate!(self, led_green_and_yellow_to_yellow_limit, v, 0., 15.);
+        validate!(self, led_yellow_to_yellow_and_red_limit, v, 0., 15.);
+        validate!(self, led_yellow_and_red_to_red_flashing_limit, v, 0., 15.);
         if self.modbus_id < 1 || self.modbus_id > 247 {
             bail!("modbus_id 1 <= x <= 247");
         }
         if self.meterbus_id < 1 || self.meterbus_id > 15 {
             bail!("meterbus_id 1 <= x <= 15");
         }
-        validate!(mppt_fixed_vmp, v, 0, 120);
-        if self.mppt_fixed_vmp_percent < 0 || self.mppt_fixed_vmp_percent > 1 {
+        validate!(self, mppt_fixed_vmp, v, 0., 120.);
+        if self.mppt_fixed_vmp_percent < 0. || self.mppt_fixed_vmp_percent > 1. {
             bail!("mppt_fixed_vmp_percent 0 <= x <= 1")
         }
-        validate!(charge_current_limit, a, 0, 40);
+        validate!(self, charge_current_limit, a, 0., 40.);
         Ok(())
     }
 }
@@ -367,12 +365,14 @@ impl Coil {
 pub struct Connection(Modbus);
 
 impl Connection {
-    pub fn connect(device: &str, slave: u8) -> Result<Connection> {
+    pub fn new(device: &str, modbus_id: u8) -> Result<Connection> {
         let mut con =
-            Modbus::new_rtu(device, 9600, 'N', 8, 2)
-            .chain_error(|| "failed to create a new rtu object")?;
-        con.set_slave(slave).chain_error(|| "failed to set modbus id")?;
-        con.connect().chain_error(|| "failed to connect to device")?;
+            Modbus::new_rtu(device, 9600, 'N', 8, 2).map_err(Error::from)
+            .chain_err(|| "failed to create a new rtu object")?;
+        con.set_slave(modbus_id).map_err(Error::from)
+            .chain_err(|| "failed to set modbus id")?;
+        con.connect().map_err(Error::from)
+            .chain_err(|| "failed to connect to device")?;
         Ok(Connection(con))
     }
 
@@ -389,7 +389,6 @@ impl Connection {
     pub fn stats(&self, stats: &mut Stats) -> Result<()> {
         let mut raw = [0u16; 81];
         self.0.read_registers(0x0, 80, &mut raw)?;
-        stats.timestamp = Local::now();
         stats.software_version = raw[0x0000];
         stats.battery_voltage_settings_multiplier = raw[0x0001];
         stats.supply_3v3 = v(gf32(raw[0x0004]));
@@ -444,43 +443,44 @@ impl Connection {
     }
 
     pub fn read_settings(&self, settings: &mut Settings) -> Result<()> {
-        let base = 0xE000;
-        let mut raw = [0u16; 0xE038 - base];
-        self.0.read_registers(base, 0xE0038 - base, &mut raw)?;
-        settings.regulation_voltage = v(gf32(raw[0xE000 - base]));
-        settings.float_voltage = v(gf32(raw[0xE001 - base]));
-        settings.time_before_float = sec(gf32(raw[0xE002 - base]));
-        settings.time_before_float_low_battery = sec(gf32(raw[0xE003 - base]));
-        settings.float_low_battery_voltage_trigger = v(gf32(raw[0xE004 - base]));
-        settings.float_cancel_voltage = v(gf32(raw[0xE005 - base]));
-        settings.exit_float_time = sec(gf32(raw[0xE006 - base]));
-        settings.equalize_voltage = v(gf32(raw[0xE007 - base]));
-        settings.days_between_equalize_cycles = day(gf32(raw[0xE008 - base]));
-        settings.equalize_time_limit_above_regulation_voltage = sec(gf32(raw[0xE009 - base]));
-        settings.equalize_time_limit_at_regulation_voltage = sec(gf32(raw[0xE00A - base]));
-        settings.alarm_on_setting_change = raw[0xE00D] == 1;
-        settings.reference_charge_voltage_limit = v(gf32(raw[0xE010 - base]));
-        settings.battery_charge_current_limit = a(gf32(raw[0xE013 - base]));
-        settings.temperature_compensation_coefficent = v(gf32(raw[0xE01A - base]));
-        settings.high_voltage_disconnect = v(gf32(raw[0xE01B - base]));
-        settings.high_voltage_reconnect = v(gf32(raw[0xE01C - base]));
-        settings.maximum_charge_voltage_reference = v(gf32(raw[0xE01D - base]));
-        settings.max_battery_temp_compensation_limit = c(gf32(raw[0xE01E - base]));
-        settings.min_battery_temp_compensation_limit = c(gf32(raw[0xE01F - base]));
-        settings.load_low_voltage_disconnect = v(gf32(raw[0xE022 - base]));
-        settings.load_low_voltage_reconnect = v(gf32(raw[0xE023 - base]));
-        settings.load_high_voltage_disconnect = v(gf32(raw[0xE024 - base]));
-        settings.load_high_voltage_reconnect = v(gf32(raw[0xE025 - base]));
-        settings.lvd_load_current_compensation = ohm(gf32(raw[0xE026 - base]));
-        settings.lvd_warning_timeout = sec(gf32(raw[0xE027 - base]));
-        settings.led_green_to_green_and_yellow_limit = v(gf32(raw[0xE030 - base]));
-        settings.led_green_and_yellow_to_yellow_limit = v(gf32(raw[0xE031 - base]));
-        settings.led_yellow_to_yellow_and_red_limit = v(gf32(raw[0xE032 - base]));
-        settings.led_yellow_and_red_to_red_flashing_limit = v(gf32(raw[0xE033 - base]));
-        settings.modbus_id = raw[0xE034 - base] as u8;
-        settings.meterbus_id = raw[0xE35 - base] as u8;
-        settings.mppt_fixed_vmp = v(gf32(raw[0xE036 - base]));
-        settings.mppt_fixed_vmp_percent = gf32(raw[0xE037 - base]);
-        settings.charge_current_limit = a(gf32(raw[0xE038 - base]));
+        const BASE: usize = 0xE000;
+        let mut raw = [0u16; 0xE039 - BASE];
+        self.0.read_registers(BASE as u16, 0xE038 - BASE as u16, &mut raw)?;
+        settings.regulation_voltage = v(gf32(raw[0xE000 - BASE]));
+        settings.float_voltage = v(gf32(raw[0xE001 - BASE]));
+        settings.time_before_float = sec(gf32(raw[0xE002 - BASE]));
+        settings.time_before_float_low_battery = sec(gf32(raw[0xE003 - BASE]));
+        settings.float_low_battery_voltage_trigger = v(gf32(raw[0xE004 - BASE]));
+        settings.float_cancel_voltage = v(gf32(raw[0xE005 - BASE]));
+        settings.exit_float_time = sec(gf32(raw[0xE006 - BASE]));
+        settings.equalize_voltage = v(gf32(raw[0xE007 - BASE]));
+        settings.days_between_equalize_cycles = dy(gf32(raw[0xE008 - BASE]));
+        settings.equalize_time_limit_above_regulation_voltage = sec(gf32(raw[0xE009 - BASE]));
+        settings.equalize_time_limit_at_regulation_voltage = sec(gf32(raw[0xE00A - BASE]));
+        settings.alarm_on_setting_change = raw[0xE00D - BASE] == 1;
+        settings.reference_charge_voltage_limit = v(gf32(raw[0xE010 - BASE]));
+        settings.battery_charge_current_limit = a(gf32(raw[0xE013 - BASE]));
+        settings.temperature_compensation_coefficent = v(gf32(raw[0xE01A - BASE]));
+        settings.high_voltage_disconnect = v(gf32(raw[0xE01B - BASE]));
+        settings.high_voltage_reconnect = v(gf32(raw[0xE01C - BASE]));
+        settings.maximum_charge_voltage_reference = v(gf32(raw[0xE01D - BASE]));
+        settings.max_battery_temp_compensation_limit = c(gf32(raw[0xE01E - BASE]));
+        settings.min_battery_temp_compensation_limit = c(gf32(raw[0xE01F - BASE]));
+        settings.load_low_voltage_disconnect = v(gf32(raw[0xE022 - BASE]));
+        settings.load_low_voltage_reconnect = v(gf32(raw[0xE023 - BASE]));
+        settings.load_high_voltage_disconnect = v(gf32(raw[0xE024 - BASE]));
+        settings.load_high_voltage_reconnect = v(gf32(raw[0xE025 - BASE]));
+        settings.lvd_load_current_compensation = om(gf32(raw[0xE026 - BASE]));
+        settings.lvd_warning_timeout = sec(gf32(raw[0xE027 - BASE]));
+        settings.led_green_to_green_and_yellow_limit = v(gf32(raw[0xE030 - BASE]));
+        settings.led_green_and_yellow_to_yellow_limit = v(gf32(raw[0xE031 - BASE]));
+        settings.led_yellow_to_yellow_and_red_limit = v(gf32(raw[0xE032 - BASE]));
+        settings.led_yellow_and_red_to_red_flashing_limit = v(gf32(raw[0xE033 - BASE]));
+        settings.modbus_id = raw[0xE034 - BASE] as u8;
+        settings.meterbus_id = raw[0xE035 - BASE] as u8;
+        settings.mppt_fixed_vmp = v(gf32(raw[0xE036 - BASE]));
+        settings.mppt_fixed_vmp_percent = gf32(raw[0xE037 - BASE]);
+        settings.charge_current_limit = a(gf32(raw[0xE038 - BASE]));
+        Ok(())
     }
 }
