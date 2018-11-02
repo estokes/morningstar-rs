@@ -7,5 +7,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate chrono;
+#[macro_use]
+extern crate error_chain;
 
+pub mod error;
 pub mod prostar_mppt;
