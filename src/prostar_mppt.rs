@@ -195,7 +195,7 @@ pub struct Stats {
     pub heatsink_temperature: ThermodynamicTemperature,
     pub battery_temperature: ThermodynamicTemperature,
     pub ambient_temperature: ThermodynamicTemperature,
-    pub rts_temperature: ThermodynamicTemperature,
+    pub rts_temperature: Option<ThermodynamicTemperature>,
     pub u_inductor_temperature: ThermodynamicTemperature,
     pub v_inductor_temperature: ThermodynamicTemperature,
     pub w_inductor_temperature: ThermodynamicTemperature,
@@ -410,7 +410,10 @@ impl Connection {
             heatsink_temperature: c(gf32(raw[0x001A])),
             battery_temperature: c(gf32(raw[0x001B])),
             ambient_temperature: c(gf32(raw[0x001C])),
-            rts_temperature: c(gf32(raw[0x001D])),
+            rts_temperature: {
+                let t = gf32(raw[0x001D]);
+                if t.is_nan() { None } else { Some(c(t)) }
+            },
             u_inductor_temperature: c(gf32(raw[0x001E])),
             v_inductor_temperature: c(gf32(raw[0x001F])),
             w_inductor_temperature: c(gf32(raw[0x0020])),
