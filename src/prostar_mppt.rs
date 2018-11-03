@@ -2,6 +2,7 @@
 Interface with the Prostar MPPT (all models) as documented at
 http://support.morningstarcorp.com/wp-content/uploads/2015/12/PSMPPT_public-MODBUS-doc_v04.pdf
 */
+use chrono::prelude::*;
 use libmodbus_rs::{Modbus, ModbusRTU, ModbusClient};
 use half::f16;
 use uom::si::{
@@ -174,8 +175,9 @@ impl From<u16> for LoadState {
 }
 
 /** Charge controller statistics */
-#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Stats {
+    pub timestamp: DateTime<Local>,
     pub software_version: u16,
     pub battery_voltage_settings_multiplier: u16,
     pub supply_3v3: ElectricPotential,
@@ -386,101 +388,104 @@ impl Connection {
         Ok(self.0.write_bit(coil.address(), val)?)
     }
 
-    pub fn stats(&self, stats: &mut Stats) -> Result<()> {
+    pub fn stats(&self) -> Result<Stats> {
         let mut raw = [0u16; 81];
         self.0.read_registers(0x0, 80, &mut raw)?;
-        stats.software_version = raw[0x0000];
-        stats.battery_voltage_settings_multiplier = raw[0x0001];
-        stats.supply_3v3 = v(gf32(raw[0x0004]));
-        stats.supply_12v = v(gf32(raw[0x0005]));
-        stats.supply_5v = v(gf32(raw[0x0006]));
-        stats.gate_drive_voltage = v(gf32(raw[0x0007]));
-        stats.battery_terminal_voltage = v(gf32(raw[0x0012]));
-        stats.array_voltage = v(gf32(raw[0x0013]));
-        stats.load_voltage = v(gf32(raw[0x0014]));
-        stats.charge_current = a(gf32(raw[0x0010]));
-        stats.load_current = a(gf32(raw[0x0016]));
-        stats.battery_current_net = a(gf32(raw[0x0015]));
-        stats.battery_sense_voltage = v(gf32(raw[0x0017]));
-        stats.meterbus_voltage = v(gf32(raw[0x0008]));
-        stats.heatsink_temperature = c(gf32(raw[0x001A]));
-        stats.battery_temperature = c(gf32(raw[0x001B]));
-        stats.ambient_temperature = c(gf32(raw[0x001C]));
-        stats.rts_temperature = c(gf32(raw[0x001D]));
-        stats.u_inductor_temperature = c(gf32(raw[0x001E]));
-        stats.v_inductor_temperature = c(gf32(raw[0x001F]));
-        stats.w_inductor_temperature = c(gf32(raw[0x0020]));
-        stats.charge_state = ChargeState::from(raw[0x0021]);
-        stats.array_faults = ArrayFaults::from_bits_truncate(raw[0x0022]);
-        stats.battery_voltage_slow = v(gf32(raw[0x0023]));
-        stats.target_voltage = v(gf32(raw[0x0024]));
-        stats.ah_charge_resettable = ah(gu32(raw[0x0026], raw[0x0027]) as f32 * 0.1);
-        stats.ah_charge_total = ah(gu32(raw[0x0028], raw[0x0029]) as f32 * 0.1);
-        stats.kwh_charge_resettable = kwh(gf32(raw[0x002A]) * 0.1);
-        stats.kwh_charge_total = kwh(gf32(raw[0x002B]) * 0.1);
-        stats.load_state = LoadState::from(raw[0x002E]);
-        stats.load_faults = LoadFaults::from_bits_truncate(raw[0x002F]);
-        stats.lvd_setpoint = v(gf32(raw[0x0030]));
-        stats.ah_load_resettable = ah(gu32(raw[0x0032], raw[0x0033]) as f32 * 0.1);
-        stats.ah_load_total = ah(gu32(raw[0x0034], raw[0x0035]) as f32 * 0.1);
-        stats.hourmeter = hr(gu32(raw[0x0036], raw[0x0037]) as f32);
-        stats.alarms = Alarms::from_bits_truncate((raw[0x0038] as u32) << 16 | raw[0x0039] as u32);
-        stats.array_power = w(gf32(raw[0x003C]));
-        stats.array_vmp = v(gf32(raw[0x003D]));
-        stats.array_max_power_sweep = v(gf32(raw[0x003E]));
-        stats.array_voc = v(gf32(raw[0x003F]));
-        stats.battery_v_min_daily = v(gf32(raw[0x0041]));
-        stats.battery_v_max_daily = v(gf32(raw[0x0042]));
-        stats.ah_charge_daily = ah(gf32(raw[0x0043]));
-        stats.ah_load_daily = ah(gf32(raw[0x0044]));
-        stats.array_faults_daily = ArrayFaults::from_bits_truncate(raw[0x0045]);
-        stats.load_faults_daily = LoadFaults::from_bits_truncate(raw[0x0046]);
-        stats.alarms_daily = Alarms::from_bits_truncate((raw[0x0047] as u32) << 16 | raw[0x0048] as u32);
-        stats.array_voltage_max_daily = v(gf32(raw[0x004C]));
-        stats.array_voltage_fixed = v(gf32(raw[0x004F]));
-        stats.array_voc_percent_fixed = gf32(raw[0x0050]);
-        Ok(())
+        Ok(Stats {
+            timestamp: Local::now(),
+            software_version: raw[0x0000],
+            battery_voltage_settings_multiplier: raw[0x0001],
+            supply_3v3: v(gf32(raw[0x0004])),
+            supply_12v: v(gf32(raw[0x0005])),
+            supply_5v: v(gf32(raw[0x0006])),
+            gate_drive_voltage: v(gf32(raw[0x0007])),
+            battery_terminal_voltage: v(gf32(raw[0x0012])),
+            array_voltage: v(gf32(raw[0x0013])),
+            load_voltage: v(gf32(raw[0x0014])),
+            charge_current: a(gf32(raw[0x0010])),
+            load_current: a(gf32(raw[0x0016])),
+            battery_current_net: a(gf32(raw[0x0015])),
+            battery_sense_voltage: v(gf32(raw[0x0017])),
+            meterbus_voltage: v(gf32(raw[0x0008])),
+            heatsink_temperature: c(gf32(raw[0x001A])),
+            battery_temperature: c(gf32(raw[0x001B])),
+            ambient_temperature: c(gf32(raw[0x001C])),
+            rts_temperature: c(gf32(raw[0x001D])),
+            u_inductor_temperature: c(gf32(raw[0x001E])),
+            v_inductor_temperature: c(gf32(raw[0x001F])),
+            w_inductor_temperature: c(gf32(raw[0x0020])),
+            charge_state: ChargeState::from(raw[0x0021]),
+            array_faults: ArrayFaults::from_bits_truncate(raw[0x0022]),
+            battery_voltage_slow: v(gf32(raw[0x0023])),
+            target_voltage: v(gf32(raw[0x0024])),
+            ah_charge_resettable: ah(gu32(raw[0x0026], raw[0x0027]) as f32 * 0.1),
+            ah_charge_total: ah(gu32(raw[0x0028], raw[0x0029]) as f32 * 0.1),
+            kwh_charge_resettable: kwh(gf32(raw[0x002A]) * 0.1),
+            kwh_charge_total: kwh(gf32(raw[0x002B]) * 0.1),
+            load_state: LoadState::from(raw[0x002E]),
+            load_faults: LoadFaults::from_bits_truncate(raw[0x002F]),
+            lvd_setpoint: v(gf32(raw[0x0030])),
+            ah_load_resettable: ah(gu32(raw[0x0032], raw[0x0033]) as f32 * 0.1),
+            ah_load_total: ah(gu32(raw[0x0034], raw[0x0035]) as f32 * 0.1),
+            hourmeter: hr(gu32(raw[0x0036], raw[0x0037]) as f32),
+            alarms: Alarms::from_bits_truncate((raw[0x0038] as u32) << 16 | raw[0x0039] as u32),
+            array_power: w(gf32(raw[0x003C])),
+            array_vmp: v(gf32(raw[0x003D])),
+            array_max_power_sweep: v(gf32(raw[0x003E])),
+            array_voc: v(gf32(raw[0x003F])),
+            battery_v_min_daily: v(gf32(raw[0x0041])),
+            battery_v_max_daily: v(gf32(raw[0x0042])),
+            ah_charge_daily: ah(gf32(raw[0x0043])),
+            ah_load_daily: ah(gf32(raw[0x0044])),
+            array_faults_daily: ArrayFaults::from_bits_truncate(raw[0x0045]),
+            load_faults_daily: LoadFaults::from_bits_truncate(raw[0x0046]),
+            alarms_daily: Alarms::from_bits_truncate((raw[0x0047] as u32) << 16 | raw[0x0048] as u32),
+            array_voltage_max_daily: v(gf32(raw[0x004C])),
+            array_voltage_fixed: v(gf32(raw[0x004F])),
+            array_voc_percent_fixed: gf32(raw[0x0050])
+        })
     }
 
-    pub fn read_settings(&self, settings: &mut Settings) -> Result<()> {
+    pub fn read_settings(&self) -> Result<Settings> {
         const BASE: usize = 0xE000;
         let mut raw = [0u16; 0xE039 - BASE];
         self.0.read_registers(BASE as u16, 0xE038 - BASE as u16, &mut raw)?;
-        settings.regulation_voltage = v(gf32(raw[0xE000 - BASE]));
-        settings.float_voltage = v(gf32(raw[0xE001 - BASE]));
-        settings.time_before_float = sec(gf32(raw[0xE002 - BASE]));
-        settings.time_before_float_low_battery = sec(gf32(raw[0xE003 - BASE]));
-        settings.float_low_battery_voltage_trigger = v(gf32(raw[0xE004 - BASE]));
-        settings.float_cancel_voltage = v(gf32(raw[0xE005 - BASE]));
-        settings.exit_float_time = sec(gf32(raw[0xE006 - BASE]));
-        settings.equalize_voltage = v(gf32(raw[0xE007 - BASE]));
-        settings.days_between_equalize_cycles = dy(gf32(raw[0xE008 - BASE]));
-        settings.equalize_time_limit_above_regulation_voltage = sec(gf32(raw[0xE009 - BASE]));
-        settings.equalize_time_limit_at_regulation_voltage = sec(gf32(raw[0xE00A - BASE]));
-        settings.alarm_on_setting_change = raw[0xE00D - BASE] == 1;
-        settings.reference_charge_voltage_limit = v(gf32(raw[0xE010 - BASE]));
-        settings.battery_charge_current_limit = a(gf32(raw[0xE013 - BASE]));
-        settings.temperature_compensation_coefficent = v(gf32(raw[0xE01A - BASE]));
-        settings.high_voltage_disconnect = v(gf32(raw[0xE01B - BASE]));
-        settings.high_voltage_reconnect = v(gf32(raw[0xE01C - BASE]));
-        settings.maximum_charge_voltage_reference = v(gf32(raw[0xE01D - BASE]));
-        settings.max_battery_temp_compensation_limit = c(gf32(raw[0xE01E - BASE]));
-        settings.min_battery_temp_compensation_limit = c(gf32(raw[0xE01F - BASE]));
-        settings.load_low_voltage_disconnect = v(gf32(raw[0xE022 - BASE]));
-        settings.load_low_voltage_reconnect = v(gf32(raw[0xE023 - BASE]));
-        settings.load_high_voltage_disconnect = v(gf32(raw[0xE024 - BASE]));
-        settings.load_high_voltage_reconnect = v(gf32(raw[0xE025 - BASE]));
-        settings.lvd_load_current_compensation = om(gf32(raw[0xE026 - BASE]));
-        settings.lvd_warning_timeout = sec(gf32(raw[0xE027 - BASE]));
-        settings.led_green_to_green_and_yellow_limit = v(gf32(raw[0xE030 - BASE]));
-        settings.led_green_and_yellow_to_yellow_limit = v(gf32(raw[0xE031 - BASE]));
-        settings.led_yellow_to_yellow_and_red_limit = v(gf32(raw[0xE032 - BASE]));
-        settings.led_yellow_and_red_to_red_flashing_limit = v(gf32(raw[0xE033 - BASE]));
-        settings.modbus_id = raw[0xE034 - BASE] as u8;
-        settings.meterbus_id = raw[0xE035 - BASE] as u8;
-        settings.mppt_fixed_vmp = v(gf32(raw[0xE036 - BASE]));
-        settings.mppt_fixed_vmp_percent = gf32(raw[0xE037 - BASE]);
-        settings.charge_current_limit = a(gf32(raw[0xE038 - BASE]));
-        Ok(())
+        Ok(Settings {
+            regulation_voltage: v(gf32(raw[0xE000 - BASE])),
+            float_voltage: v(gf32(raw[0xE001 - BASE])),
+            time_before_float: sec(gf32(raw[0xE002 - BASE])),
+            time_before_float_low_battery: sec(gf32(raw[0xE003 - BASE])),
+            float_low_battery_voltage_trigger: v(gf32(raw[0xE004 - BASE])),
+            float_cancel_voltage: v(gf32(raw[0xE005 - BASE])),
+            exit_float_time: sec(gf32(raw[0xE006 - BASE])),
+            equalize_voltage: v(gf32(raw[0xE007 - BASE])),
+            days_between_equalize_cycles: dy(gf32(raw[0xE008 - BASE])),
+            equalize_time_limit_above_regulation_voltage: sec(gf32(raw[0xE009 - BASE])),
+            equalize_time_limit_at_regulation_voltage: sec(gf32(raw[0xE00A - BASE])),
+            alarm_on_setting_change: raw[0xE00D - BASE] == 1,
+            reference_charge_voltage_limit: v(gf32(raw[0xE010 - BASE])),
+            battery_charge_current_limit: a(gf32(raw[0xE013 - BASE])),
+            temperature_compensation_coefficent: v(gf32(raw[0xE01A - BASE])),
+            high_voltage_disconnect: v(gf32(raw[0xE01B - BASE])),
+            high_voltage_reconnect: v(gf32(raw[0xE01C - BASE])),
+            maximum_charge_voltage_reference: v(gf32(raw[0xE01D - BASE])),
+            max_battery_temp_compensation_limit: c(gf32(raw[0xE01E - BASE])),
+            min_battery_temp_compensation_limit: c(gf32(raw[0xE01F - BASE])),
+            load_low_voltage_disconnect: v(gf32(raw[0xE022 - BASE])),
+            load_low_voltage_reconnect: v(gf32(raw[0xE023 - BASE])),
+            load_high_voltage_disconnect: v(gf32(raw[0xE024 - BASE])),
+            load_high_voltage_reconnect: v(gf32(raw[0xE025 - BASE])),
+            lvd_load_current_compensation: om(gf32(raw[0xE026 - BASE])),
+            lvd_warning_timeout: sec(gf32(raw[0xE027 - BASE])),
+            led_green_to_green_and_yellow_limit: v(gf32(raw[0xE030 - BASE])),
+            led_green_and_yellow_to_yellow_limit: v(gf32(raw[0xE031 - BASE])),
+            led_yellow_to_yellow_and_red_limit: v(gf32(raw[0xE032 - BASE])),
+            led_yellow_and_red_to_red_flashing_limit: v(gf32(raw[0xE033 - BASE])),
+            modbus_id: raw[0xE034 - BASE] as u8,
+            meterbus_id: raw[0xE035 - BASE] as u8,
+            mppt_fixed_vmp: v(gf32(raw[0xE036 - BASE])),
+            mppt_fixed_vmp_percent: gf32(raw[0xE037 - BASE]),
+            charge_current_limit: a(gf32(raw[0xE038 - BASE]))
+        })
     }
 }
