@@ -6,6 +6,7 @@ use chrono::prelude::*;
 use libmodbus_rs::{Modbus, ModbusRTU, ModbusClient};
 use half::f16;
 use uom::si::{
+    Unit,
     f32::*,
     thermodynamic_temperature::degree_celsius,
     electric_potential::volt,
@@ -16,6 +17,7 @@ use uom::si::{
     energy::kilowatt_hour,
     time::{hour, second, day}
 };
+use std::fmt;
 use error::*;
 
 fn gu32(h: u16, l: u16) -> u32 { (h as u32) << 16 | (l as u32) }
@@ -228,6 +230,83 @@ pub struct Stats {
     pub array_voltage_max_daily: ElectricPotential,
     pub array_voltage_fixed: ElectricPotential,
     pub array_voc_percent_fixed: f32,
+}
+
+macro_rules! as_unit {
+    ($f:ident, $obj:ident, $field:ident, $unit:ident) => {
+        write!(
+            $f, "    {}: {} {},\n",
+            stringify!($field),
+            $obj.$field.get::<$unit>(),
+            $unit::abbreviation()
+        )
+    }
+}
+
+impl fmt::Display for Stats {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Stats {{\n")?;
+        write!(f, "    timestamp: {},\n", self.timestamp)?;
+        write!(f, "    software_version: {},\n", self.software_version)?;
+        write!(f, "    battery_voltage_settings_multiplier: {},\n",
+               self.battery_voltage_settings_multiplier)?;
+        as_unit!(f, self, supply_3v3, volt)?;
+        as_unit!(f, self, supply_12v, volt)?;
+        as_unit!(f, self, supply_5v, volt)?;
+        as_unit!(f, self, gate_drive_voltage, volt)?;
+        as_unit!(f, self, battery_terminal_voltage, volt)?;
+        as_unit!(f, self, array_voltage, volt)?;
+        as_unit!(f, self, load_voltage, volt)?;
+        as_unit!(f, self, charge_current, ampere)?;
+        as_unit!(f, self, load_current, ampere)?;
+        as_unit!(f, self, battery_current_net, ampere)?;
+        as_unit!(f, self, battery_sense_voltage, volt)?;
+        as_unit!(f, self, meterbus_voltage, volt)?;
+        as_unit!(f, self, heatsink_temperature, degree_celsius)?;
+        as_unit!(f, self, battery_temperature, degree_celsius)?;
+        as_unit!(f, self, ambient_temperature, degree_celsius)?;
+        match self.rts_temperature {
+            None => write!(f, "    rts_temperature: None,\n")?,
+            Some(t) => write!(
+                f, "    rts_temperature: {} {},\n", t.get::<degree_celsius>(),
+                degree_celsius::abbreviation()
+            )?
+        }
+        as_unit!(f, self, u_inductor_temperature, degree_celsius)?;
+        as_unit!(f, self, v_inductor_temperature, degree_celsius)?;
+        as_unit!(f, self, w_inductor_temperature, degree_celsius)?;
+        write!(f, "    charge_state: {:#?},\n", self.charge_state)?;
+        write!(f, "    array_faults: {:#?},\n", self.array_faults)?;
+        as_unit!(f, self, battery_voltage_slow, volt)?;
+        as_unit!(f, self, target_voltage, volt)?;
+        as_unit!(f, self, ah_charge_resettable, ampere_hour)?;
+        as_unit!(f, self, ah_charge_total, ampere_hour)?;
+        as_unit!(f, self, kwh_charge_resettable, kilowatt_hour)?;
+        as_unit!(f, self, kwh_charge_total, kilowatt_hour)?;
+        write!(f, "    load_state: {:#?},\n", self.load_state)?;
+        write!(f, "    load_faults: {:#?},\n", self.load_faults)?;
+        as_unit!(f, self, lvd_setpoint, volt)?;
+        as_unit!(f, self, ah_load_resettable, ampere_hour)?;
+        as_unit!(f, self, ah_load_total, ampere_hour)?;
+        as_unit!(f, self, hourmeter, hour)?;
+        write!(f, "    alarms: {:#?},\n", self.alarms)?;
+        as_unit!(f, self, array_power, watt)?;
+        as_unit!(f, self, array_vmp, volt)?;
+        as_unit!(f, self, array_max_power_sweep, volt)?;
+        as_unit!(f, self, array_voc, volt)?;
+        as_unit!(f, self, battery_v_min_daily, volt)?;
+        as_unit!(f, self, battery_v_max_daily, volt)?;
+        as_unit!(f, self, ah_charge_daily, ampere_hour)?;
+        as_unit!(f, self, ah_load_daily, ampere_hour)?;
+        write!(f, "    array_faults_daily: {:#?},\n", self.array_faults_daily)?;
+        write!(f, "    load_faults_daily: {:#?},\n", self.load_faults_daily)?;
+        write!(f, "    alarms_daily: {:#?},\n", self.alarms_daily)?;
+        as_unit!(f, self, array_voltage_max_daily, volt)?;
+        as_unit!(f, self, array_voltage_fixed, volt)?;
+        write!(f, "    array_voc_percent_fixed: {},\n", self.array_voc_percent_fixed)?;
+        write!(f, "}}")?;
+        Ok(())
+    }
 }
 
 /** Device configuration settings */
