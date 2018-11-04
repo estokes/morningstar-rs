@@ -361,35 +361,35 @@ macro_rules! validate {
 
 impl Settings {
     pub fn validate(&self) -> Result<()> {
-        validate!(self, regulation_voltage, v, 0., 15.);
-        validate!(self, float_voltage, v, 0., 15.);
+        validate!(self, regulation_voltage, v, 0., 17.5);
+        validate!(self, float_voltage, v, 0., 17.5);
         validate!(self, time_before_float, sec, 0., 65535.);
         validate!(self, time_before_float_low_battery, sec, 0., 65535.);
-        validate!(self, float_low_battery_voltage_trigger, v, 0., 15.);
-        validate!(self, float_cancel_voltage, v, 0., 15.);
+        validate!(self, float_low_battery_voltage_trigger, v, 0., 17.5);
+        validate!(self, float_cancel_voltage, v, 0., 17.5);
         validate!(self, exit_float_time, sec, 0., 65535.);
-        validate!(self, equalize_voltage, v, 0., 15.);
+        validate!(self, equalize_voltage, v, 0., 17.5);
         validate!(self, days_between_equalize_cycles, dy, 0., 255.);
         validate!(self, equalize_time_limit_above_regulation_voltage, sec, 0., 65535.);
         validate!(self, equalize_time_limit_at_regulation_voltage, sec, 0., 65535.);
-        validate!(self, reference_charge_voltage_limit, v, 0., 15.);
+        validate!(self, reference_charge_voltage_limit, v, 0., 17.5);
         validate!(self, battery_charge_current_limit, a, 0., 40.);
-        validate!(self, temperature_compensation_coefficent, v, 0., 15.);
-        validate!(self, high_voltage_disconnect, v, 0., 15.);
-        validate!(self, high_voltage_reconnect, v, 0., 15.);
-        validate!(self, maximum_charge_voltage_reference, v, 0., 15.);
+        validate!(self, temperature_compensation_coefficent, v, 0., 17.5);
+        validate!(self, high_voltage_disconnect, v, 0., 17.5);
+        validate!(self, high_voltage_reconnect, v, 0., 17.5);
+        validate!(self, maximum_charge_voltage_reference, v, 0., 17.5);
         validate!(self, max_battery_temp_compensation_limit, c, -128., 127.);
         validate!(self, min_battery_temp_compensation_limit, c, -128., 127.);
-        validate!(self, load_low_voltage_disconnect, v, 0., 15.);
-        validate!(self, load_low_voltage_reconnect, v, 0., 15.);
-        validate!(self, load_high_voltage_disconnect, v, 0., 15.);
-        validate!(self, load_high_voltage_reconnect, v, 0., 15.);
+        validate!(self, load_low_voltage_disconnect, v, 0., 17.5);
+        validate!(self, load_low_voltage_reconnect, v, 0., 17.5);
+        validate!(self, load_high_voltage_disconnect, v, 0., 17.5);
+        validate!(self, load_high_voltage_reconnect, v, 0., 17.5);
         validate!(self, lvd_load_current_compensation, om, 0., 10000.);
         validate!(self, lvd_warning_timeout, sec, 0., 65535.);
-        validate!(self, led_green_to_green_and_yellow_limit, v, 0., 15.);
-        validate!(self, led_green_and_yellow_to_yellow_limit, v, 0., 15.);
-        validate!(self, led_yellow_to_yellow_and_red_limit, v, 0., 15.);
-        validate!(self, led_yellow_and_red_to_red_flashing_limit, v, 0., 15.);
+        validate!(self, led_green_to_green_and_yellow_limit, v, 0., 17.5);
+        validate!(self, led_green_and_yellow_to_yellow_limit, v, 0., 17.5);
+        validate!(self, led_yellow_to_yellow_and_red_limit, v, 0., 17.5);
+        validate!(self, led_yellow_and_red_to_red_flashing_limit, v, 0., 17.5);
         if self.modbus_id < 1 || self.modbus_id > 247 {
             bail!("modbus_id 1 <= x <= 247");
         }
