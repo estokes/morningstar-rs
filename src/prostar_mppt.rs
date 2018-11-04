@@ -236,7 +236,7 @@ pub struct Stats {
 macro_rules! as_unit {
     ($f:ident, $obj:ident, $field:ident, $unit:ident) => {
         write!(
-            $f, "    {}: {} {},\n",
+            $f, "    {}: {:.2} {},\n",
             stringify!($field),
             $obj.$field.get::<$unit>(),
             $unit::abbreviation()
@@ -270,7 +270,7 @@ impl fmt::Display for Stats {
         match self.rts_temperature {
             None => write!(f, "    rts_temperature: None,\n")?,
             Some(t) => write!(
-                f, "    rts_temperature: {} {},\n", t.get::<degree_celsius>(),
+                f, "    rts_temperature: {} {:.2},\n", t.get::<degree_celsius>(),
                 degree_celsius::abbreviation()
             )?
         }
@@ -305,7 +305,7 @@ impl fmt::Display for Stats {
         write!(f, "    alarms_daily: {:#?},\n", self.alarms_daily)?;
         as_unit!(f, self, array_voltage_max_daily, volt)?;
         as_unit!(f, self, array_voltage_fixed, volt)?;
-        write!(f, "    array_voc_percent_fixed: {},\n", self.array_voc_percent_fixed)?;
+        write!(f, "    array_voc_percent_fixed: {:.2},\n", self.array_voc_percent_fixed)?;
         write!(f, "}}")?;
         Ok(())
     }
