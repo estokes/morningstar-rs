@@ -190,6 +190,7 @@ pub struct Stats {
     pub array_voltage: ElectricPotential,
     pub load_voltage: ElectricPotential,
     pub charge_current: ElectricCurrent,
+    pub array_current: ElectricCurrent,
     pub load_current: ElectricCurrent,
     pub battery_current_net: ElectricCurrent,
     pub battery_sense_voltage: ElectricPotential,
@@ -258,6 +259,7 @@ impl fmt::Display for Stats {
         as_unit!(f, self, array_voltage, volt)?;
         as_unit!(f, self, load_voltage, volt)?;
         as_unit!(f, self, charge_current, ampere)?;
+        as_unit!(f, self, array_current, ampere)?;
         as_unit!(f, self, load_current, ampere)?;
         as_unit!(f, self, battery_current_net, ampere)?;
         as_unit!(f, self, battery_sense_voltage, volt)?;
@@ -482,6 +484,7 @@ impl Connection {
             array_voltage: v(gf32(raw[0x0013])),
             load_voltage: v(gf32(raw[0x0014])),
             charge_current: a(gf32(raw[0x0010])),
+            array_current: a(gf32(raw[0x0011])),
             load_current: a(gf32(raw[0x0016])),
             battery_current_net: a(gf32(raw[0x0015])),
             battery_sense_voltage: v(gf32(raw[0x0017])),
