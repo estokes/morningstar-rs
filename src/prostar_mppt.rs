@@ -21,7 +21,10 @@ use std::fmt;
 use error::*;
 
 fn gu32(h: u16, l: u16) -> u32 { (h as u32) << 16 | (l as u32) }
-fn gf32(u: u16) -> f32 { f16::from_bits(u).to_f32() }
+fn gf32(u: u16) -> f32 {
+    let v = f16::from_bits(u).to_f32();
+    if v.is_nan() { 0. } else { v }
+}
 fn v(u: f32) -> ElectricPotential { ElectricPotential::new::<volt>(u) }
 fn a(u: f32) -> ElectricCurrent { ElectricCurrent::new::<ampere>(u) }
 fn ah(u: f32) -> ElectricCharge { ElectricCharge::new::<ampere_hour>(u) }
@@ -361,7 +364,7 @@ macro_rules! validate {
 
 impl fmt::Display for Settings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Settings {{")?;
+        write!(f, "Settings {{\n")?;
         as_unit!(f, self, regulation_voltage, volt)?;
         as_unit!(f, self, float_voltage, volt)?;
         as_unit!(f, self, time_before_float, second)?;
