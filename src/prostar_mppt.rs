@@ -359,6 +359,49 @@ macro_rules! validate {
     }
 }
 
+impl fmt::Display for Settings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Settings {{")?;
+        as_unit!(f, self, regulation_voltage, volt)?;
+        as_unit!(f, self, float_voltage, volt)?;
+        as_unit!(f, self, time_before_float, second)?;
+        as_unit!(f, self, time_before_float_low_battery, second)?;
+        as_unit!(f, self, float_low_battery_voltage_trigger, volt)?;
+        as_unit!(f, self, float_cancel_voltage, volt)?;
+        as_unit!(f, self, exit_float_time, second)?;
+        as_unit!(f, self, equalize_voltage, volt)?;
+        as_unit!(f, self, days_between_equalize_cycles, day)?;
+        as_unit!(f, self, equalize_time_limit_above_regulation_voltage, second)?;
+        as_unit!(f, self, equalize_time_limit_at_regulation_voltage, second)?;
+        write!(f, "    alarm_on_setting_change: {},\n", self.alarm_on_setting_change)?;
+        as_unit!(f, self, reference_charge_voltage_limit, volt)?;
+        as_unit!(f, self, battery_charge_current_limit, ampere)?;
+        as_unit!(f, self, temperature_compensation_coefficent, volt)?;
+        as_unit!(f, self, high_voltage_disconnect, volt)?;
+        as_unit!(f, self, high_voltage_reconnect, volt)?;
+        as_unit!(f, self, maximum_charge_voltage_reference, volt)?;
+        as_unit!(f, self, max_battery_temp_compensation_limit, degree_celsius)?;
+        as_unit!(f, self, min_battery_temp_compensation_limit, degree_celsius)?;
+        as_unit!(f, self, load_low_voltage_disconnect, volt)?;
+        as_unit!(f, self, load_low_voltage_reconnect, volt)?;
+        as_unit!(f, self, load_high_voltage_disconnect, volt)?;
+        as_unit!(f, self, load_high_voltage_reconnect, volt)?;
+        as_unit!(f, self, lvd_load_current_compensation, ohm)?;
+        as_unit!(f, self, lvd_warning_timeout, second)?;
+        as_unit!(f, self, led_green_to_green_and_yellow_limit, volt)?;
+        as_unit!(f, self, led_green_and_yellow_to_yellow_limit, volt)?;
+        as_unit!(f, self, led_yellow_to_yellow_and_red_limit, volt)?;
+        as_unit!(f, self, led_yellow_and_red_to_red_flashing_limit, volt)?;
+        write!(f, "    modbus_id: {},\n", self.modbus_id)?;
+        write!(f, "    meterbus_id: {},\n", self.meterbus_id)?;
+        as_unit!(f, self, mppt_fixed_vmp, volt)?;
+        write!(f, "    mppt_fixed_vmp_percent: {},\n", self.mppt_fixed_vmp_percent)?;
+        as_unit!(f, self, charge_current_limit, ampere)?;
+        write!(f, "}}")?;
+        Ok(())
+    }
+}
+
 impl Settings {
     pub fn validate(&self) -> Result<()> {
         validate!(self, regulation_voltage, v, 0., 17.5);
