@@ -404,7 +404,7 @@ impl fmt::Display for Settings {
         as_unit!(f, self, load_high_voltage_disconnect, volt)?;
         as_unit!(f, self, load_high_voltage_reconnect, volt)?;
         as_unit!(f, self, lvd_load_current_compensation, ohm)?;
-        as_unit!(f, self, lvd_warning_timeout, second)?;
+        as_unit!(f, self, lvd_warning_timeout, minute)?;
         as_unit!(f, self, led_green_to_green_and_yellow_limit, volt)?;
         as_unit!(f, self, led_green_and_yellow_to_yellow_limit, volt)?;
         as_unit!(f, self, led_yellow_to_yellow_and_red_limit, volt)?;
