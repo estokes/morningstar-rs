@@ -15,9 +15,9 @@ use uom::si::{
     electrical_resistance::ohm,
     power::watt,
     energy::kilowatt_hour,
-    time::{hour, second, day}
+    time::{hour, minute, second, day}
 };
-use std::fmt;
+use std::{fmt, mem::transmute};
 use error::*;
 
 fn gu32(h: u16, l: u16) -> u32 { (h as u32) << 16 | (l as u32) }
@@ -30,8 +30,11 @@ fn v(u: f32) -> ElectricPotential { ElectricPotential::new::<volt>(u) }
 fn to_a(v: ElectricCurrent) -> u16 { f16::from_f32(v.get::<ampere>()).to_bits() }
 fn a(u: f32) -> ElectricCurrent { ElectricCurrent::new::<ampere>(u) }
 fn ah(u: f32) -> ElectricCharge { ElectricCharge::new::<ampere_hour>(u) }
-fn to_c(c: ThermodynamicTemperature) -> u16 { f16::from_f32(c.get::<degree_celsius>()).to_bits() }
+fn to_ic(c: ThermodynamicTemperature) -> u16 { unsafe { transmute::<i16, u16>(c.get::<degree_celsius>() as i16) } }
 fn c(u: f32) -> ThermodynamicTemperature { ThermodynamicTemperature::new::<degree_celsius>(u) }
+fn ic(u: u16) -> ThermodynamicTemperature {
+    ThermodynamicTemperature::new::<degree_celsius>(unsafe { transmute::<u16, i16>(u) } as f32)
+}
 fn w(u: f32) -> Power { Power::new::<watt>(u) }
 fn to_om(r: ElectricalResistance) -> u16 { f16::from_f32(r.get::<ohm>()).to_bits() }
 fn om(u: f32) -> ElectricalResistance { ElectricalResistance::new::<ohm>(u) }
@@ -41,6 +44,8 @@ fn to_sec(s: Time) -> u16 { s.get::<second>() as u16 }
 fn sec(u: f32) -> Time { Time::new::<second>(u) }
 fn to_dy(d: Time) -> u16 { d.get::<day>() as u16 }
 fn dy(u: f32) -> Time { Time::new::<day>(u) }
+fn mn(u: f32) -> Time { Time::new::<minute>(u) }
+fn to_mn(m: Time) -> u16 { m.get::<minute>() as u16 }
 
 const SETTINGS_BASE: usize = 0xE000;
 const SETTINGS_END: usize = 0xE038;
@@ -587,9 +592,9 @@ impl Connection {
     }
 
     pub fn read_settings(&self) -> Result<Settings> {
-        let mut raw = [0u16; SETTINGS_END - SETTINGS_BASE];
+        let mut raw = [0u16; (SETTINGS_END - SETTINGS_BASE) + 1];
         self.0.read_registers(
-            SETTINGS_BASE as u16, SETTINGS_END - SETTINGS_BASE as u16, &mut raw)?;
+            SETTINGS_BASE as u16, (SETTINGS_END - SETTINGS_BASE) as u16, &mut raw)?;
         Ok(Settings {
             regulation_voltage: v(gf32(raw[0xE000 - SETTINGS_BASE])),
             float_voltage: v(gf32(raw[0xE001 - SETTINGS_BASE])),
@@ -609,14 +614,14 @@ impl Connection {
             high_voltage_disconnect: v(gf32(raw[0xE01B - SETTINGS_BASE])),
             high_voltage_reconnect: v(gf32(raw[0xE01C - SETTINGS_BASE])),
             maximum_charge_voltage_reference: v(gf32(raw[0xE01D - SETTINGS_BASE])),
-            max_battery_temp_compensation_limit: c(gf32(raw[0xE01E - SETTINGS_BASE])),
-            min_battery_temp_compensation_limit: c(gf32(raw[0xE01F - SETTINGS_BASE])),
+            max_battery_temp_compensation_limit: ic(raw[0xE01E - SETTINGS_BASE]),
+            min_battery_temp_compensation_limit: ic(raw[0xE01F - SETTINGS_BASE]),
             load_low_voltage_disconnect: v(gf32(raw[0xE022 - SETTINGS_BASE])),
             load_low_voltage_reconnect: v(gf32(raw[0xE023 - SETTINGS_BASE])),
             load_high_voltage_disconnect: v(gf32(raw[0xE024 - SETTINGS_BASE])),
             load_high_voltage_reconnect: v(gf32(raw[0xE025 - SETTINGS_BASE])),
             lvd_load_current_compensation: om(gf32(raw[0xE026 - SETTINGS_BASE])),
-            lvd_warning_timeout: sec(raw[0xE027 - SETTINGS_BASE] as f32),
+            lvd_warning_timeout: mn(raw[0xE027 - SETTINGS_BASE] as f32),
             led_green_to_green_and_yellow_limit: v(gf32(raw[0xE030 - SETTINGS_BASE])),
             led_green_and_yellow_to_yellow_limit: v(gf32(raw[0xE031 - SETTINGS_BASE])),
             led_yellow_to_yellow_and_red_limit: v(gf32(raw[0xE032 - SETTINGS_BASE])),
@@ -633,10 +638,10 @@ impl Connection {
     /// if alarm_on_setting_change is false the controller will not
     /// work until a reset.
     pub fn write_settings(&self, settings: &Settings) -> Result<()> {
-        let mut raw = [0u16; SETTINGS_END - SETTINGS_BASE];
+        let mut raw = [0u16; (SETTINGS_END - SETTINGS_BASE) + 1];
         settings.validate()?;
         self.0.read_registers(
-            SETTINGS_BASE as u16, SETTINGS_END - SETTINGS_BASE as u16, &mut raw)?;
+            SETTINGS_BASE as u16, (SETTINGS_END - SETTINGS_BASE) as u16, &mut raw)?;
         raw[0xE000 - SETTINGS_BASE] = to_v(settings.regulation_voltage);
         raw[0xE001 - SETTINGS_BASE] = to_v(settings.float_voltage);
         raw[0xE002 - SETTINGS_BASE] = to_sec(settings.time_before_float);
@@ -648,32 +653,32 @@ impl Connection {
         raw[0xE008 - SETTINGS_BASE] = to_dy(settings.days_between_equalize_cycles);
         raw[0xE009 - SETTINGS_BASE] = to_sec(settings.equalize_time_limit_above_regulation_voltage);
         raw[0xE00A - SETTINGS_BASE] = to_sec(settings.equalize_time_limit_at_regulation_voltage);
-        raw[0xE00D - SETTINGS_BASE] = if settings.alarm_on_settings_change { 1 } else { 0 };
+        raw[0xE00D - SETTINGS_BASE] = if settings.alarm_on_setting_change { 1 } else { 0 };
         raw[0xE010 - SETTINGS_BASE] = to_v(settings.reference_charge_voltage_limit);
         raw[0xE013 - SETTINGS_BASE] = to_a(settings.battery_charge_current_limit);
         raw[0xE01A - SETTINGS_BASE] = to_v(settings.temperature_compensation_coefficent);
         raw[0xE01B - SETTINGS_BASE] = to_v(settings.high_voltage_disconnect);
         raw[0xE01C - SETTINGS_BASE] = to_v(settings.high_voltage_reconnect);
         raw[0xE01D - SETTINGS_BASE] = to_v(settings.maximum_charge_voltage_reference);
-        raw[0xE01E - SETTINGS_BASE] = to_c(settings.max_battery_temp_compensation_limit);
-        raw[0xE01F - SETTINGS_BASE] = to_c(settings.min_battery_temp_compensation_limit);
+        raw[0xE01E - SETTINGS_BASE] = to_ic(settings.max_battery_temp_compensation_limit);
+        raw[0xE01F - SETTINGS_BASE] = to_ic(settings.min_battery_temp_compensation_limit);
         raw[0xE022 - SETTINGS_BASE] = to_v(settings.load_low_voltage_disconnect);
         raw[0xE023 - SETTINGS_BASE] = to_v(settings.load_low_voltage_reconnect);
         raw[0xE024 - SETTINGS_BASE] = to_v(settings.load_high_voltage_disconnect);
         raw[0xE025 - SETTINGS_BASE] = to_v(settings.load_high_voltage_reconnect);
         raw[0xE026 - SETTINGS_BASE] = to_om(settings.lvd_load_current_compensation);
-        raw[0xE027 - SETTINGS_BASE] = to_sec(settings.lvd_warning_timeout);
+        raw[0xE027 - SETTINGS_BASE] = to_mn(settings.lvd_warning_timeout);
         raw[0xE030 - SETTINGS_BASE] = to_v(settings.led_green_to_green_and_yellow_limit);
         raw[0xE031 - SETTINGS_BASE] = to_v(settings.led_green_and_yellow_to_yellow_limit);
         raw[0xE032 - SETTINGS_BASE] = to_v(settings.led_yellow_to_yellow_and_red_limit);
         raw[0xE033 - SETTINGS_BASE] = to_v(settings.led_yellow_and_red_to_red_flashing_limit);
-        raw[0xE034 - SETTINGS_BASE] = settings.modbus_id as u8;
-        raw[0xE035 - SETTINGS_BASE] = settings.metermus_id as u8;
+        raw[0xE034 - SETTINGS_BASE] = settings.modbus_id as u16;
+        raw[0xE035 - SETTINGS_BASE] = settings.meterbus_id as u16;
         raw[0xE036 - SETTINGS_BASE] = to_v(settings.mppt_fixed_vmp);;
         raw[0xE037 - SETTINGS_BASE] = f16::from_f32(settings.mppt_fixed_vmp_percent).to_bits();
         raw[0xE038 - SETTINGS_BASE] = to_a(settings.charge_current_limit);
         self.0.write_registers(
-            SETTINGS_BASE as u16, SETTINGS_END - SETTINGS_BASE as u16, &raw)?;
+            SETTINGS_BASE as u16, (SETTINGS_END - SETTINGS_BASE) as u16, &raw)?;
         Ok(())
     }
 }
