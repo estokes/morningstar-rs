@@ -1,0 +1,11 @@
+0.1.3
+Add example to prostar module
+
+0.1.2
+Add read and write config for Prostar MPPT models, tested on Prostar MPPT-40M
+
+0.1.1
+Fix a few bugs
+
+0.1.0
+Initial release, stats and coils only for Prostar MPPT
