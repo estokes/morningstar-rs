@@ -92,69 +92,69 @@ impl From<u16> for ChargeState {
 bitflags! {
     #[derive(Default, Serialize, Deserialize)]
     pub struct ArrayFaults: u16 {
-        const Overcurrent                = 0x0001;
-        const MOSFETShorted              = 0x0002;
-        const Software                   = 0x0004;
-        const BatteryHVD                 = 0x0008;
-        const ArrayHVD                   = 0x0010;
-        const CustomSettingsEdit         = 0x0020;
-        const RTSShorted                 = 0x0040;
-        const RTSNoLongerValid           = 0x0080;
-        const LocalTempSensorDamaged     = 0x0100;
-        const BatterLowVoltageDisconnect = 0x0200;
-        const SlaveTimeout               = 0x0400;
-        const DIPSwitchChanged           = 0x0800;
-        const Fault13                    = 0x1000;
-        const Fault14                    = 0x2000;
-        const Fault15                    = 0x4000;
-        const Fault16                    = 0x8000;
+        const OVER_CURRENT                   = 0x0001;
+        const MOSFET_SHORTED                 = 0x0002;
+        const SOFTWARE                       = 0x0004;
+        const BATTERY_HVD                    = 0x0008;
+        const ARRAY_HVD                      = 0x0010;
+        const CUSTOM_SETTINGS_EDIT           = 0x0020;
+        const RTS_SHORTED                    = 0x0040;
+        const RTS_NO_LONGER_VALID            = 0x0080;
+        const LOCAL_TEMP_SENSOR_DAMAGED      = 0x0100;
+        const BATTERY_LOW_VOLTAGE_DISCONNECT = 0x0200;
+        const SLAVE_TIMEOUT                  = 0x0400;
+        const DIP_SWITCH_CHANGED             = 0x0800;
+        const FAULT13                        = 0x1000;
+        const FAULT14                        = 0x2000;
+        const FAULT15                        = 0x4000;
+        const FAULT16                        = 0x8000;
     }
 }
 
 bitflags! {
     #[derive(Default, Serialize, Deserialize)]
     pub struct LoadFaults: u16 {
-        const ExternalShortCircuit = 0x0001;
-        const Overcurrent          = 0x0002;
-        const MOSFETShorted        = 0x0004;
-        const Software             = 0x0008;
-        const LoadHVD              = 0x0010;
-        const HighTempDisconnect   = 0x0020;
-        const DipSwitchChanged     = 0x0040;
-        const CustomSettingsEdit   = 0x0080;
+        const EXTERNAL_SHORT_CIRCIT = 0x0001;
+        const OVERCURRENT           = 0x0002;
+        const MOSFET_SHORTED        = 0x0004;
+        const SOFTWARE              = 0x0008;
+        const LOAD_HVD              = 0x0010;
+        const HIGH_TEMP_DISCONNECT  = 0x0020;
+        const DIP_SWITCH_CHANGED    = 0x0040;
+        const CUSTOM_SETTINGS_EDIT  = 0x0080;
     }
 }
     
 bitflags! {
     #[derive(Default, Serialize, Deserialize)]
     pub struct Alarms: u32 {
-        const RTSOpen                   = 0x00000001;
-        const RTSShorted                = 0x00000002;
-        const RTSDisconnected           = 0x00000004;
-        const HeatsinkTempSensorOpen    = 0x00000008;
-        const HeatsinkTempSensorShorted = 0x00000010;
-        const HeatsinkTempLimit         = 0x00000020;
-        const InductorTempSensorOpen    = 0x00000040;
-        const InductorTempSensorShorted = 0x00000080;
-        const InductorTempLimit         = 0x00000100;
-        const CurrentLimit              = 0x00000200;
-        const CurrentMeasurementError   = 0x00000400;
-        const BatterySenseOutOfRange    = 0x00000800;
-        const BatterySenseDisconnected  = 0x00001000;
-        const Uncalibrated              = 0x00002000;
-        const TB5V                      = 0x00004000;
-        const FP10SupplyOutOfRange      = 0x00008000;
-        const UNUSED                    = 0x00010000;
-        const MOSFETOpen                = 0x00020000;
-        const ArrayCurrentOffset        = 0x00040000;
-        const LoadCurrentOffset         = 0x00080000;
-        const P3v3SupplyOutOfRange      = 0x00100000;
-        const P12vSupplyOutOfRange      = 0x00200000;
-        const HighInputVoltageLimit     = 0x00400000;
-        const ControllerReset           = 0x00800000;
-        const LoadLVD                   = 0x01000000;
-        const LogTimeout                = 0x02000000;
-        const EEPROMAccessFailure       = 0x04000000;
+        const RTS_OPEN                     = 0x00000001;
+        const RTS_SHORTED                  = 0x00000002;
+        const RTS_DISCONNECTED             = 0x00000004;
+        const HEATSINK_TEMP_SENSOR_OPEN    = 0x00000008;
+        const HEATSINK_TEMP_SENSOR_SHORTED = 0x00000010;
+        const HEATSINK_TEMP_LIMIT          = 0x00000020;
+        const INDUCTOR_TEMP_SENSOR_OPEN    = 0x00000040;
+        const INDUCTOR_TEMP_SENSOR_SHORTED = 0x00000080;
+        const INDUCTOR_TEMP_LIMIT          = 0x00000100;
+        const CURRENT_LIMIT                = 0x00000200;
+        const CURRENT_MEASUREMENT_ERROR    = 0x00000400;
+        const BATTERY_SENSE_OUT_OF_RANGE   = 0x00000800;
+        const BATTERY_SENSE_DISCONNECTED   = 0x00001000;
+        const UNCALIBRATED                 = 0x00002000;
+        const TB5V                         = 0x00004000;
+        const FP10SUPPLY_OUT_OF_RANGE      = 0x00008000;
+        const UNUSED                       = 0x00010000;
+        const MOSFET_OPEN                  = 0x00020000;
+        const ARRAY_CURRENT_OFFSET         = 0x00040000;
+        const LOAD_CURRENT_OFFSET          = 0x00080000;
+        const P3V3_SUPPLY_OUT_OF_RANGE     = 0x00100000;
+        const P12V_SUPPLY_OUT_OF_RANGE     = 0x00200000;
+        const HIGH_INPUT_VOLTAGE_LIMIT     = 0x00400000;
+        const CONTROLLER_RESET             = 0x00800000;
+        const LOAD_LVD                     = 0x01000000;
+        const LOG_TIMEOUT                  = 0x02000000;
+        const EEPROM_ACCESS_FAILURE        = 0x04000000;
     }
 }
 
@@ -565,8 +565,8 @@ impl Connection {
             target_voltage: v(gf32(raw[0x0024])),
             ah_charge_resettable: ah(gu32(raw[0x0026], raw[0x0027]) as f32 * 0.1),
             ah_charge_total: ah(gu32(raw[0x0028], raw[0x0029]) as f32 * 0.1),
-            kwh_charge_resettable: kwh(gf32(raw[0x002A]) * 0.1),
-            kwh_charge_total: kwh(gf32(raw[0x002B]) * 0.1),
+            kwh_charge_resettable: kwh(gf32(raw[0x002A])),
+            kwh_charge_total: kwh(gf32(raw[0x002B])),
             load_state: LoadState::from(raw[0x002E]),
             load_faults: LoadFaults::from_bits_truncate(raw[0x002F]),
             lvd_setpoint: v(gf32(raw[0x0030])),
