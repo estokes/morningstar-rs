@@ -1,6 +1,6 @@
 [package]
 name = "morningstar"
-version = "0.1.2"
+version = "0.1.4"
 authors = ["Eric Stokes"]
 description = "A small library to control Morningstar solar charge controllers"
 categories = ["hardware-support"]
