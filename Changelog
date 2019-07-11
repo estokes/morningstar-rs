@@ -1,3 +1,7 @@
+0.1.5
+Fix bit flag names
+Fix kWh totals were divided by 10 in stats
+
 0.1.4
 Fix my example didn't show up in the right place!
 

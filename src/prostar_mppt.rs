@@ -68,7 +68,7 @@ fn to_mn(m: Time) -> u16 { m.get::<minute>() as u16 }
 const SETTINGS_BASE: usize = 0xE000;
 const SETTINGS_END: usize = 0xE038;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChargeState {
     UnknownState(u16),
     Start,
@@ -176,17 +176,17 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum LoadState {
     Unknown(u16),
     Start,
-    Normal,
     LVDWarning,
     LVD,
     Fault,
     Disconnect,
     NormalOff,
     Override,
+    Normal,
     NotUsed
 }
 
