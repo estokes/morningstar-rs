@@ -1,4 +1,8 @@
+0.2.0
+Same as 0.1.5
+
 0.1.5
+Yanked due to semantic version break
 Fix bit flag names
 Fix kWh totals were divided by 10 in stats
 
