@@ -1,69 +1,111 @@
+use anyhow::{Context, Result};
 /**
 Interface with the Prostar MPPT (all models) as documented at
 http://support.morningstarcorp.com/wp-content/uploads/2015/12/PSMPPT_public-MODBUS-doc_v04.pdf
 
 # Examples
 ```
-use morningstar::{error as mse, prostar_mppt as ps};
+use morningstar::prostar_mppt as ps;
 use std::{thread::sleep, time::{Instant, Duration}};
 
-let con = ps::Connection::new("/dev/ttyUSB0", 1).expect("connection failed");
-println!("{}", con.stats().expect("failed to get stats"));
-// It doesn't like getting commands too quickly
-sleep(Duration::from_millis(500));
+let con = ps::Connection::new("/dev/ttyUSB0", 1).await.expect("connection failed");
+println!("{}", con.stats().await.expect("failed to get stats"));
 
 // Stop charging the battery
-con.write_coil(ps::Coil::ChargeDisconnect, true).expect("failed to stop charging");
-sleep(Duration::from_millis(500));
+con.write_coil(ps::Coil::ChargeDisconnect, true).await.expect("failed to stop charging");
 
 // Start Charging again
-con.write_coil(ps::Coil::ChargeDisconnect, false).expect("failed to start charging");
+con.write_coil(ps::Coil::ChargeDisconnect, false).await.expect("failed to start charging");
 ```
 */
 use chrono::prelude::*;
-use libmodbus_rs::{Modbus, ModbusRTU, ModbusClient};
 use half::f16;
-use uom::si::{
-    Unit,
-    f32::*,
-    thermodynamic_temperature::degree_celsius,
-    electric_potential::volt,
-    electric_current::ampere,
-    electric_charge::ampere_hour,
-    electrical_resistance::ohm,
-    power::watt,
-    energy::kilowatt_hour,
-    time::{hour, minute, second, day}
-};
 use std::{fmt, mem::transmute, thread::sleep, time::Duration};
-use error::*;
+use tokio_modbus::{client::Context as Modbus, prelude::*};
+use tokio_serial::{Serial, SerialPortSettings};
+use uom::si::{
+    electric_charge::ampere_hour,
+    electric_current::ampere,
+    electric_potential::volt,
+    electrical_resistance::ohm,
+    energy::kilowatt_hour,
+    f32::*,
+    power::watt,
+    thermodynamic_temperature::degree_celsius,
+    time::{day, hour, minute, second},
+    Unit,
+};
 
-fn gu32(h: u16, l: u16) -> u32 { (h as u32) << 16 | (l as u32) }
+fn gu32(h: u16, l: u16) -> u32 {
+    (h as u32) << 16 | (l as u32)
+}
 fn gf32(u: u16) -> f32 {
     let v = f16::from_bits(u).to_f32();
-    if v.is_nan() { 0. } else { v }
+    if v.is_nan() {
+        0.
+    } else {
+        v
+    }
 }
-fn to_v(v: ElectricPotential) -> u16 { f16::from_f32(v.get::<volt>()).to_bits() }
-fn v(u: f32) -> ElectricPotential { ElectricPotential::new::<volt>(u) }
-fn to_a(v: ElectricCurrent) -> u16 { f16::from_f32(v.get::<ampere>()).to_bits() }
-fn a(u: f32) -> ElectricCurrent { ElectricCurrent::new::<ampere>(u) }
-fn ah(u: f32) -> ElectricCharge { ElectricCharge::new::<ampere_hour>(u) }
-fn to_ic(c: ThermodynamicTemperature) -> u16 { unsafe { transmute::<i16, u16>(c.get::<degree_celsius>() as i16) } }
-fn c(u: f32) -> ThermodynamicTemperature { ThermodynamicTemperature::new::<degree_celsius>(u) }
+fn to_v(v: ElectricPotential) -> u16 {
+    f16::from_f32(v.get::<volt>()).to_bits()
+}
+fn v(u: f32) -> ElectricPotential {
+    ElectricPotential::new::<volt>(u)
+}
+fn to_a(v: ElectricCurrent) -> u16 {
+    f16::from_f32(v.get::<ampere>()).to_bits()
+}
+fn a(u: f32) -> ElectricCurrent {
+    ElectricCurrent::new::<ampere>(u)
+}
+fn ah(u: f32) -> ElectricCharge {
+    ElectricCharge::new::<ampere_hour>(u)
+}
+fn to_ic(c: ThermodynamicTemperature) -> u16 {
+    unsafe { transmute::<i16, u16>(c.get::<degree_celsius>() as i16) }
+}
+fn c(u: f32) -> ThermodynamicTemperature {
+    ThermodynamicTemperature::new::<degree_celsius>(u)
+}
 fn ic(u: u16) -> ThermodynamicTemperature {
-    ThermodynamicTemperature::new::<degree_celsius>(unsafe { transmute::<u16, i16>(u) } as f32)
+    ThermodynamicTemperature::new::<degree_celsius>(
+        unsafe { transmute::<u16, i16>(u) } as f32
+    )
 }
-fn w(u: f32) -> Power { Power::new::<watt>(u) }
-fn to_om(r: ElectricalResistance) -> u16 { f16::from_f32(r.get::<ohm>()).to_bits() }
-fn om(u: f32) -> ElectricalResistance { ElectricalResistance::new::<ohm>(u) }
-fn kwh(u: f32) -> Energy { Energy::new::<kilowatt_hour>(u) }
-fn hr(u: f32) -> Time { Time::new::<hour>(u) }
-fn to_sec(s: Time) -> u16 { s.get::<second>() as u16 }
-fn sec(u: f32) -> Time { Time::new::<second>(u) }
-fn to_dy(d: Time) -> u16 { d.get::<day>() as u16 }
-fn dy(u: f32) -> Time { Time::new::<day>(u) }
-fn mn(u: f32) -> Time { Time::new::<minute>(u) }
-fn to_mn(m: Time) -> u16 { m.get::<minute>() as u16 }
+fn w(u: f32) -> Power {
+    Power::new::<watt>(u)
+}
+fn to_om(r: ElectricalResistance) -> u16 {
+    f16::from_f32(r.get::<ohm>()).to_bits()
+}
+fn om(u: f32) -> ElectricalResistance {
+    ElectricalResistance::new::<ohm>(u)
+}
+fn kwh(u: f32) -> Energy {
+    Energy::new::<kilowatt_hour>(u)
+}
+fn hr(u: f32) -> Time {
+    Time::new::<hour>(u)
+}
+fn to_sec(s: Time) -> u16 {
+    s.get::<second>() as u16
+}
+fn sec(u: f32) -> Time {
+    Time::new::<second>(u)
+}
+fn to_dy(d: Time) -> u16 {
+    d.get::<day>() as u16
+}
+fn dy(u: f32) -> Time {
+    Time::new::<day>(u)
+}
+fn mn(u: f32) -> Time {
+    Time::new::<minute>(u)
+}
+fn to_mn(m: Time) -> u16 {
+    m.get::<minute>() as u16
+}
 
 const SETTINGS_BASE: usize = 0xE000;
 const SETTINGS_END: usize = 0xE038;
@@ -81,11 +123,13 @@ pub enum ChargeState {
     Float,
     Equalize,
     Slave,
-    Fixed
+    Fixed,
 }
 
 impl Default for ChargeState {
-    fn default() -> Self { ChargeState::UnknownState(0) }
+    fn default() -> Self {
+        ChargeState::UnknownState(0)
+    }
 }
 
 impl From<u16> for ChargeState {
@@ -102,7 +146,7 @@ impl From<u16> for ChargeState {
             8u16 => ChargeState::Equalize,
             9u16 => ChargeState::Slave,
             10u16 => ChargeState::Fixed,
-            i => ChargeState::UnknownState(i)
+            i => ChargeState::UnknownState(i),
         }
     }
 }
@@ -142,7 +186,7 @@ bitflags! {
         const CUSTOM_SETTINGS_EDIT  = 0x0080;
     }
 }
-    
+
 bitflags! {
     #[derive(Default, Serialize, Deserialize)]
     pub struct Alarms: u32 {
@@ -187,11 +231,13 @@ pub enum LoadState {
     NormalOff,
     Override,
     Normal,
-    NotUsed
+    NotUsed,
 }
 
 impl Default for LoadState {
-    fn default() -> Self { LoadState::Unknown(0) }
+    fn default() -> Self {
+        LoadState::Unknown(0)
+    }
 }
 
 impl From<u16> for LoadState {
@@ -206,7 +252,7 @@ impl From<u16> for LoadState {
             6u16 => LoadState::NormalOff,
             7u16 => LoadState::Override,
             8u16 => LoadState::NotUsed,
-            i => LoadState::Unknown(i)
+            i => LoadState::Unknown(i),
         }
     }
 }
@@ -271,12 +317,13 @@ pub struct Stats {
 macro_rules! as_unit {
     ($f:ident, $obj:ident, $field:ident, $unit:ident) => {
         write!(
-            $f, "    {}: {:.2} {},\n",
+            $f,
+            "    {}: {:.2} {},\n",
             stringify!($field),
             $obj.$field.get::<$unit>(),
             $unit::abbreviation()
         )
-    }
+    };
 }
 
 impl fmt::Display for Stats {
@@ -284,8 +331,11 @@ impl fmt::Display for Stats {
         write!(f, "Stats {{\n")?;
         write!(f, "    timestamp: {},\n", self.timestamp)?;
         write!(f, "    software_version: {},\n", self.software_version)?;
-        write!(f, "    battery_voltage_settings_multiplier: {},\n",
-               self.battery_voltage_settings_multiplier)?;
+        write!(
+            f,
+            "    battery_voltage_settings_multiplier: {},\n",
+            self.battery_voltage_settings_multiplier
+        )?;
         as_unit!(f, self, supply_3v3, volt)?;
         as_unit!(f, self, supply_12v, volt)?;
         as_unit!(f, self, supply_5v, volt)?;
@@ -305,9 +355,11 @@ impl fmt::Display for Stats {
         match self.rts_temperature {
             None => write!(f, "    rts_temperature: None,\n")?,
             Some(t) => write!(
-                f, "    rts_temperature: {} {:.2},\n", t.get::<degree_celsius>(),
+                f,
+                "    rts_temperature: {} {:.2},\n",
+                t.get::<degree_celsius>(),
                 degree_celsius::abbreviation()
-            )?
+            )?,
         }
         as_unit!(f, self, u_inductor_temperature, degree_celsius)?;
         as_unit!(f, self, v_inductor_temperature, degree_celsius)?;
@@ -383,7 +435,7 @@ pub struct Settings {
     pub meterbus_id: u8,
     pub mppt_fixed_vmp: ElectricPotential,
     pub mppt_fixed_vmp_percent: f32,
-    pub charge_current_limit: ElectricCurrent
+    pub charge_current_limit: ElectricCurrent,
 }
 
 macro_rules! validate {
@@ -391,7 +443,7 @@ macro_rules! validate {
         if $o.$field < $unit($min) || $o.$field > $unit($max) {
             bail!("{} {} <= x <= {}", stringify!($field), $min, $max)
         }
-    }
+    };
 }
 
 impl fmt::Display for Settings {
@@ -498,26 +550,26 @@ pub enum Coil {
     ClearVbMinMax,
     LightingModeTest,
     FactoryReset,
-    ResetControl
+    ResetControl,
 }
 
 impl Coil {
     fn address(&self) -> u16 {
         match self {
-            Coil::EqualizeTriggered  => 0x0000,
-            Coil::LoadDisconnect     => 0x0001,
-            Coil::ChargeDisconnect   => 0x0002,
-            Coil::ClearAhResettable  => 0x0010,
-            Coil::ClearAhTotal       => 0x0011,
+            Coil::EqualizeTriggered => 0x0000,
+            Coil::LoadDisconnect => 0x0001,
+            Coil::ChargeDisconnect => 0x0002,
+            Coil::ClearAhResettable => 0x0010,
+            Coil::ClearAhTotal => 0x0011,
             Coil::ClearKwhResettable => 0x0012,
-            Coil::ClearFaults        => 0x0014,
-            Coil::ClearAlarms        => 0x0015,
-            Coil::ForceEEPROMUpdate  => 0x0016,
-            Coil::ClearKwhTotal      => 0x0018,
-            Coil::ClearVbMinMax      => 0x0019,
-            Coil::LightingModeTest   => 0x0020,
-            Coil::FactoryReset       => 0x00FE,
-            Coil::ResetControl       => 0x00FF
+            Coil::ClearFaults => 0x0014,
+            Coil::ClearAlarms => 0x0015,
+            Coil::ForceEEPROMUpdate => 0x0016,
+            Coil::ClearKwhTotal => 0x0018,
+            Coil::ClearVbMinMax => 0x0019,
+            Coil::LightingModeTest => 0x0020,
+            Coil::FactoryReset => 0x00FE,
+            Coil::ResetControl => 0x00FF,
         }
     }
 }
@@ -526,30 +578,43 @@ impl Coil {
 pub struct Connection(Modbus);
 
 impl Connection {
-    pub fn new(device: &str, modbus_id: u8) -> Result<Connection> {
-        let mut con =
-            Modbus::new_rtu(device, 9600, 'N', 8, 2).map_err(Error::from)
-            .chain_err(|| "failed to create a new rtu object")?;
-        con.set_slave(modbus_id).map_err(Error::from)
-            .chain_err(|| "failed to set modbus id")?;
-        con.connect().map_err(Error::from)
-            .chain_err(|| "failed to connect to device")?;
+    pub async fn new(device: &str, modbus_id: u8) -> Result<Connection> {
+        let settings =
+            SerialPortSettings { baud_rate: 19200, ..SerialPortSettings::default() };
+        let port = Serial::from_path(device, &settings)
+            .context("failed to connect to serial port")?;
+        let con = rtu::connect_slave(port, Slave(modbus_id))
+            .await
+            .context("failed to build modbus context")?;
         Ok(Connection(con))
     }
 
-    pub fn read_coil(&self, coil: Coil) -> Result<bool> {
-        let mut raw = [0u8; 1];
-        self.0.read_bits(coil.address(), 1, &mut raw)?;
-        Ok(if raw[0] == 0 { false } else { true })
+    pub async fn read_coil(&mut self, coil: Coil) -> Result<bool> {
+        let res =
+            self.0.read_coils(coil.address(), 1).await.context("read coil failed")?;
+        if res.len() != 1 {
+            bail!("wrong number of coils read {} expected 1", res.len())
+        }
+        Ok(res[0])
     }
 
-    pub fn write_coil(&self, coil: Coil, val: bool) -> Result<()> {
-        Ok(self.0.write_bit(coil.address(), val)?)
+    pub async fn write_coil(&mut self, coil: Coil, val: bool) -> Result<()> {
+        Ok(self
+            .0
+            .write_single_coil(coil.address(), val)
+            .await
+            .context("failed to write coil")?)
     }
 
-    pub fn stats(&self) -> Result<Stats> {
-        let mut raw = [0u16; 81];
-        self.0.read_registers(0x0, 80, &mut raw)?;
+    pub async fn stats(&mut self) -> Result<Stats> {
+        let raw = self
+            .0
+            .read_holding_registers(0x0, 80)
+            .await
+            .context("stats failed to read holding registers")?;
+        if raw.len() != 80 {
+            bail!("stats wrong number of registers read {} expected 80", raw.len())
+        }
         Ok(Stats {
             timestamp: Local::now(),
             software_version: raw[0x0000],
@@ -572,7 +637,11 @@ impl Connection {
             ambient_temperature: c(gf32(raw[0x001C])),
             rts_temperature: {
                 let t = gf32(raw[0x001D]);
-                if t.is_nan() { None } else { Some(c(t)) }
+                if t.is_nan() {
+                    None
+                } else {
+                    Some(c(t))
+                }
             },
             u_inductor_temperature: c(gf32(raw[0x001E])),
             v_inductor_temperature: c(gf32(raw[0x001F])),
@@ -591,7 +660,9 @@ impl Connection {
             ah_load_resettable: ah(gu32(raw[0x0032], raw[0x0033]) as f32 * 0.1),
             ah_load_total: ah(gu32(raw[0x0034], raw[0x0035]) as f32 * 0.1),
             hourmeter: hr(gu32(raw[0x0036], raw[0x0037]) as f32),
-            alarms: Alarms::from_bits_truncate((raw[0x0038] as u32) << 16 | raw[0x0039] as u32),
+            alarms: Alarms::from_bits_truncate(
+                (raw[0x0038] as u32) << 16 | raw[0x0039] as u32,
+            ),
             array_power: w(gf32(raw[0x003C])),
             array_vmp: v(gf32(raw[0x003D])),
             array_max_power_sweep: v(gf32(raw[0x003E])),
@@ -602,17 +673,29 @@ impl Connection {
             ah_load_daily: ah(gf32(raw[0x0044])),
             array_faults_daily: ArrayFaults::from_bits_truncate(raw[0x0045]),
             load_faults_daily: LoadFaults::from_bits_truncate(raw[0x0046]),
-            alarms_daily: Alarms::from_bits_truncate((raw[0x0047] as u32) << 16 | raw[0x0048] as u32),
+            alarms_daily: Alarms::from_bits_truncate(
+                (raw[0x0047] as u32) << 16 | raw[0x0048] as u32,
+            ),
             array_voltage_max_daily: v(gf32(raw[0x004C])),
             array_voltage_fixed: v(gf32(raw[0x004F])),
-            array_voc_percent_fixed: gf32(raw[0x0050])
+            array_voc_percent_fixed: gf32(raw[0x0050]),
         })
     }
 
-    pub fn read_settings(&self) -> Result<Settings> {
-        let mut raw = [0u16; (SETTINGS_END - SETTINGS_BASE) + 1];
-        self.0.read_registers(
-            SETTINGS_BASE as u16, (SETTINGS_END - SETTINGS_BASE) as u16, &mut raw)?;
+    pub async fn read_settings(&mut self) -> Result<Settings> {
+        let len = (SETTINGS_END - SETTINGS_BASE) as u16;
+        let raw = self
+            .0
+            .read_holding_registers(SETTINGS_BASE as u16, len)
+            .await
+            .context("read_settings failed to read registers")?;
+        if raw.len() != len as usize {
+            bail!(
+                "read_settings read unexpected number of registers {} expected {}",
+                raw.len(),
+                len
+            );
+        }
         Ok(Settings {
             regulation_voltage: v(gf32(raw[0xE000 - SETTINGS_BASE])),
             float_voltage: v(gf32(raw[0xE001 - SETTINGS_BASE])),
@@ -623,8 +706,12 @@ impl Connection {
             exit_float_time: sec(raw[0xE006 - SETTINGS_BASE] as f32),
             equalize_voltage: v(gf32(raw[0xE007 - SETTINGS_BASE])),
             days_between_equalize_cycles: dy(raw[0xE008 - SETTINGS_BASE] as f32),
-            equalize_time_limit_above_regulation_voltage: sec(raw[0xE009 - SETTINGS_BASE] as f32),
-            equalize_time_limit_at_regulation_voltage: sec(raw[0xE00A - SETTINGS_BASE] as f32),
+            equalize_time_limit_above_regulation_voltage: sec(
+                raw[0xE009 - SETTINGS_BASE] as f32,
+            ),
+            equalize_time_limit_at_regulation_voltage: sec(
+                raw[0xE00A - SETTINGS_BASE] as f32
+            ),
             alarm_on_setting_change: raw[0xE00D - SETTINGS_BASE] == 1,
             reference_charge_voltage_limit: v(gf32(raw[0xE010 - SETTINGS_BASE])),
             battery_charge_current_limit: a(gf32(raw[0xE013 - SETTINGS_BASE])),
@@ -643,66 +730,153 @@ impl Connection {
             led_green_to_green_and_yellow_limit: v(gf32(raw[0xE030 - SETTINGS_BASE])),
             led_green_and_yellow_to_yellow_limit: v(gf32(raw[0xE031 - SETTINGS_BASE])),
             led_yellow_to_yellow_and_red_limit: v(gf32(raw[0xE032 - SETTINGS_BASE])),
-            led_yellow_and_red_to_red_flashing_limit: v(gf32(raw[0xE033 - SETTINGS_BASE])),
+            led_yellow_and_red_to_red_flashing_limit: v(gf32(
+                raw[0xE033 - SETTINGS_BASE],
+            )),
             modbus_id: raw[0xE034 - SETTINGS_BASE] as u8,
             meterbus_id: raw[0xE035 - SETTINGS_BASE] as u8,
             mppt_fixed_vmp: v(gf32(raw[0xE036 - SETTINGS_BASE])),
             mppt_fixed_vmp_percent: gf32(raw[0xE037 - SETTINGS_BASE]),
-            charge_current_limit: a(gf32(raw[0xE038 - SETTINGS_BASE]))
+            charge_current_limit: a(gf32(raw[0xE038 - SETTINGS_BASE])),
         })
     }
 
-
-    fn write_setting(&self, addr: usize, cur: &[u16], new: u16) -> Result<()> {
-        if cur[addr - SETTINGS_BASE] == new { Ok(()) } else {
+    async fn write_setting(&mut self, addr: usize, cur: &[u16], new: u16) -> Result<()> {
+        if cur[addr - SETTINGS_BASE] == new {
+            Ok(())
+        } else {
             sleep(Duration::from_millis(100));
-            Ok(self.0.write_register(addr as u16, new)?)
+            Ok(self
+                .0
+                .write_single_register(addr as u16, new)
+                .await
+                .context("write_setting failed to write to register")?)
         }
     }
 
     /// They will not take effect until the controller is reset, and
     /// if alarm_on_setting_change is false the controller will not
     /// work until a reset.
-    pub fn write_settings(&self, settings: &Settings) -> Result<()> {
-        let mut cur = [0u16; (SETTINGS_END - SETTINGS_BASE) + 1];
+    pub async fn write_settings(&mut self, settings: &Settings) -> Result<()> {
         settings.validate()?;
-        self.0.read_registers(
-            SETTINGS_BASE as u16, (SETTINGS_END - SETTINGS_BASE) as u16, &mut cur)?;
-        self.write_setting(0xE000, &cur, to_v(settings.regulation_voltage))?;
-        self.write_setting(0xE001, &cur, to_v(settings.float_voltage))?;
-        self.write_setting(0xE002, &cur, to_sec(settings.time_before_float))?;
-        self.write_setting(0xE003, &cur, to_sec(settings.time_before_float_low_battery))?;
-        self.write_setting(0xE004, &cur, to_v(settings.float_low_battery_voltage_trigger))?;
-        self.write_setting(0xE005, &cur, to_v(settings.float_cancel_voltage))?;
-        self.write_setting(0xE006, &cur, to_sec(settings.exit_float_time))?;
-        self.write_setting(0xE007, &cur, to_v(settings.equalize_voltage))?;
-        self.write_setting(0xE008, &cur, to_dy(settings.days_between_equalize_cycles))?;
-        self.write_setting(0xE009, &cur, to_sec(settings.equalize_time_limit_above_regulation_voltage))?;
-        self.write_setting(0xE00A, &cur, to_sec(settings.equalize_time_limit_at_regulation_voltage))?;
-        self.write_setting(0xE00D, &cur, if settings.alarm_on_setting_change { 1 } else { 0 })?;
-        self.write_setting(0xE010, &cur, to_v(settings.reference_charge_voltage_limit))?;
-        self.write_setting(0xE013, &cur, to_a(settings.battery_charge_current_limit))?;
-        self.write_setting(0xE01A, &cur, to_v(settings.temperature_compensation_coefficent))?;
-        self.write_setting(0xE01B, &cur, to_v(settings.high_voltage_disconnect))?;
-        self.write_setting(0xE01C, &cur, to_v(settings.high_voltage_reconnect))?;
-        self.write_setting(0xE01D, &cur, to_v(settings.maximum_charge_voltage_reference))?;
-        self.write_setting(0xE01E, &cur, to_ic(settings.max_battery_temp_compensation_limit))?;
-        self.write_setting(0xE01F, &cur, to_ic(settings.min_battery_temp_compensation_limit))?;
-        self.write_setting(0xE022, &cur, to_v(settings.load_low_voltage_disconnect))?;
-        self.write_setting(0xE023, &cur, to_v(settings.load_low_voltage_reconnect))?;
-        self.write_setting(0xE024, &cur, to_v(settings.load_high_voltage_disconnect))?;
-        self.write_setting(0xE025, &cur, to_v(settings.load_high_voltage_reconnect))?;
-        self.write_setting(0xE026, &cur, to_om(settings.lvd_load_current_compensation))?;
-        self.write_setting(0xE027, &cur, to_mn(settings.lvd_warning_timeout))?;
-        self.write_setting(0xE030, &cur, to_v(settings.led_green_to_green_and_yellow_limit))?;
-        self.write_setting(0xE031, &cur, to_v(settings.led_green_and_yellow_to_yellow_limit))?;
-        self.write_setting(0xE032, &cur, to_v(settings.led_yellow_to_yellow_and_red_limit))?;
-        self.write_setting(0xE033, &cur, to_v(settings.led_yellow_and_red_to_red_flashing_limit))?;
-        self.write_setting(0xE034, &cur, settings.modbus_id as u16)?;
-        self.write_setting(0xE035, &cur, settings.meterbus_id as u16)?;
-        self.write_setting(0xE036, &cur, to_v(settings.mppt_fixed_vmp))?;
-        self.write_setting(0xE037, &cur, f16::from_f32(settings.mppt_fixed_vmp_percent).to_bits())?;
-        self.write_setting(0xE038, &cur, to_a(settings.charge_current_limit))?;
+        let len = (SETTINGS_END - SETTINGS_BASE) as u16;
+        let cur = self
+            .0
+            .read_holding_registers(SETTINGS_BASE as u16, len)
+            .await
+            .context("write_settings failed to read current settings")?;
+        if cur.len() != len as usize {
+            bail!(
+                "write_settings, read unexpected number of settings {} expected {}",
+                cur.len(),
+                len
+            )
+        }
+        self.write_setting(0xE000, &cur, to_v(settings.regulation_voltage)).await?;
+        self.write_setting(0xE001, &cur, to_v(settings.float_voltage)).await?;
+        self.write_setting(0xE002, &cur, to_sec(settings.time_before_float)).await?;
+        self.write_setting(0xE003, &cur, to_sec(settings.time_before_float_low_battery))
+            .await?;
+        self.write_setting(
+            0xE004,
+            &cur,
+            to_v(settings.float_low_battery_voltage_trigger),
+        )
+        .await?;
+        self.write_setting(0xE005, &cur, to_v(settings.float_cancel_voltage)).await?;
+        self.write_setting(0xE006, &cur, to_sec(settings.exit_float_time)).await?;
+        self.write_setting(0xE007, &cur, to_v(settings.equalize_voltage)).await?;
+        self.write_setting(0xE008, &cur, to_dy(settings.days_between_equalize_cycles))
+            .await?;
+        self.write_setting(
+            0xE009,
+            &cur,
+            to_sec(settings.equalize_time_limit_above_regulation_voltage),
+        )
+        .await?;
+        self.write_setting(
+            0xE00A,
+            &cur,
+            to_sec(settings.equalize_time_limit_at_regulation_voltage),
+        )
+        .await?;
+        self.write_setting(
+            0xE00D,
+            &cur,
+            if settings.alarm_on_setting_change { 1 } else { 0 },
+        )
+        .await?;
+        self.write_setting(0xE010, &cur, to_v(settings.reference_charge_voltage_limit))
+            .await?;
+        self.write_setting(0xE013, &cur, to_a(settings.battery_charge_current_limit))
+            .await?;
+        self.write_setting(
+            0xE01A,
+            &cur,
+            to_v(settings.temperature_compensation_coefficent),
+        )
+        .await?;
+        self.write_setting(0xE01B, &cur, to_v(settings.high_voltage_disconnect)).await?;
+        self.write_setting(0xE01C, &cur, to_v(settings.high_voltage_reconnect)).await?;
+        self.write_setting(0xE01D, &cur, to_v(settings.maximum_charge_voltage_reference))
+            .await?;
+        self.write_setting(
+            0xE01E,
+            &cur,
+            to_ic(settings.max_battery_temp_compensation_limit),
+        )
+        .await?;
+        self.write_setting(
+            0xE01F,
+            &cur,
+            to_ic(settings.min_battery_temp_compensation_limit),
+        )
+        .await?;
+        self.write_setting(0xE022, &cur, to_v(settings.load_low_voltage_disconnect))
+            .await?;
+        self.write_setting(0xE023, &cur, to_v(settings.load_low_voltage_reconnect))
+            .await?;
+        self.write_setting(0xE024, &cur, to_v(settings.load_high_voltage_disconnect))
+            .await?;
+        self.write_setting(0xE025, &cur, to_v(settings.load_high_voltage_reconnect))
+            .await?;
+        self.write_setting(0xE026, &cur, to_om(settings.lvd_load_current_compensation))
+            .await?;
+        self.write_setting(0xE027, &cur, to_mn(settings.lvd_warning_timeout)).await?;
+        self.write_setting(
+            0xE030,
+            &cur,
+            to_v(settings.led_green_to_green_and_yellow_limit),
+        )
+        .await?;
+        self.write_setting(
+            0xE031,
+            &cur,
+            to_v(settings.led_green_and_yellow_to_yellow_limit),
+        )
+        .await?;
+        self.write_setting(
+            0xE032,
+            &cur,
+            to_v(settings.led_yellow_to_yellow_and_red_limit),
+        )
+        .await?;
+        self.write_setting(
+            0xE033,
+            &cur,
+            to_v(settings.led_yellow_and_red_to_red_flashing_limit),
+        )
+        .await?;
+        self.write_setting(0xE034, &cur, settings.modbus_id as u16).await?;
+        self.write_setting(0xE035, &cur, settings.meterbus_id as u16).await?;
+        self.write_setting(0xE036, &cur, to_v(settings.mppt_fixed_vmp)).await?;
+        self.write_setting(
+            0xE037,
+            &cur,
+            f16::from_f32(settings.mppt_fixed_vmp_percent).to_bits(),
+        )
+        .await?;
+        self.write_setting(0xE038, &cur, to_a(settings.charge_current_limit)).await?;
         Ok(())
     }
 }
