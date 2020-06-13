@@ -314,6 +314,65 @@ pub struct Stats {
     pub array_voc_percent_fixed: f32,
 }
 
+impl Default for Stats {
+    fn default() -> Stats {
+        Stats {
+            timestamp: Local::now(),
+            software_version: 0,
+            battery_voltage_settings_multiplier: 0,
+            supply_3v3: ElectricPotential::default(),
+            supply_12v: ElectricPotential::default(),
+            supply_5v: ElectricPotential::default(),
+            gate_drive_voltage: ElectricPotential::default(),
+            battery_terminal_voltage: ElectricPotential::default(),
+            array_voltage: ElectricPotential::default(),
+            load_voltage: ElectricPotential::default(),
+            charge_current: ElectricCurrent::default(),
+            array_current: ElectricCurrent::default(),
+            load_current: ElectricCurrent::default(),
+            battery_current_net: ElectricCurrent::default(),
+            battery_sense_voltage: ElectricPotential::default(),
+            meterbus_voltage: ElectricPotential::default(),
+            heatsink_temperature: ThermodynamicTemperature::default(),
+            battery_temperature: ThermodynamicTemperature::default(),
+            ambient_temperature: ThermodynamicTemperature::default(),
+            rts_temperature: None,
+            u_inductor_temperature: ThermodynamicTemperature::default(),
+            v_inductor_temperature: ThermodynamicTemperature::default(),
+            w_inductor_temperature: ThermodynamicTemperature::default(),
+            charge_state: ChargeState::default(),
+            array_faults: ArrayFaults::default(),
+            battery_voltage_slow: ElectricPotential::default(),
+            target_voltage: ElectricPotential::default(),
+            ah_charge_resettable: ElectricCharge::default(),
+            ah_charge_total: ElectricCharge::default(),
+            kwh_charge_resettable: Energy::default(),
+            kwh_charge_total: Energy::default(),
+            load_state: LoadState::default(),
+            load_faults: LoadFaults::default(),
+            lvd_setpoint: ElectricPotential::default(),
+            ah_load_resettable: ElectricCharge::default(),
+            ah_load_total: ElectricCharge::default(),
+            hourmeter: Time::default(),
+            alarms: Alarms::default(),
+            array_power: Power::default(),
+            array_vmp: ElectricPotential::default(),
+            array_max_power_sweep: ElectricPotential::default(),
+            array_voc: ElectricPotential::default(),
+            battery_v_min_daily: ElectricPotential::default(),
+            battery_v_max_daily: ElectricPotential::default(),
+            ah_charge_daily: ElectricCharge::default(),
+            ah_load_daily: ElectricCharge::default(),
+            array_faults_daily: ArrayFaults::default(),
+            load_faults_daily: LoadFaults::default(),
+            alarms_daily: Alarms::default(),
+            array_voltage_max_daily: ElectricPotential::default(),
+            array_voltage_fixed: ElectricPotential::default(),
+            array_voc_percent_fixed: 0.,
+        }
+    }
+}
+
 macro_rules! as_unit {
     ($f:ident, $obj:ident, $field:ident, $unit:ident) => {
         write!(
