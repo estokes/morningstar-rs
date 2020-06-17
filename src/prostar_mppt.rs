@@ -300,7 +300,7 @@ pub struct Stats {
     pub alarms: Alarms,
     pub array_power: Power,
     pub array_vmp: ElectricPotential,
-    pub array_max_power_sweep: ElectricPotential,
+    pub array_max_power_sweep: Power,
     pub array_voc: ElectricPotential,
     pub battery_v_min_daily: ElectricPotential,
     pub battery_v_max_daily: ElectricPotential,
@@ -357,7 +357,7 @@ impl Default for Stats {
             alarms: Alarms::default(),
             array_power: Power::default(),
             array_vmp: ElectricPotential::default(),
-            array_max_power_sweep: ElectricPotential::default(),
+            array_max_power_sweep: Power::default(),
             array_voc: ElectricPotential::default(),
             battery_v_min_daily: ElectricPotential::default(),
             battery_v_max_daily: ElectricPotential::default(),
@@ -440,7 +440,7 @@ impl fmt::Display for Stats {
         write!(f, "    alarms: {:#?},\n", self.alarms)?;
         as_unit!(f, self, array_power, watt)?;
         as_unit!(f, self, array_vmp, volt)?;
-        as_unit!(f, self, array_max_power_sweep, volt)?;
+        as_unit!(f, self, array_max_power_sweep, watt)?;
         as_unit!(f, self, array_voc, volt)?;
         as_unit!(f, self, battery_v_min_daily, volt)?;
         as_unit!(f, self, battery_v_max_daily, volt)?;
@@ -639,7 +639,7 @@ pub struct Connection(Modbus);
 impl Connection {
     pub async fn new(device: &str, modbus_id: u8) -> Result<Connection> {
         let settings =
-            SerialPortSettings { baud_rate: 19200, ..SerialPortSettings::default() };
+            SerialPortSettings { baud_rate: 9600, ..SerialPortSettings::default() };
         let port = Serial::from_path(device, &settings)
             .context("failed to connect to serial port")?;
         let con = rtu::connect_slave(port, Slave(modbus_id))
@@ -668,10 +668,10 @@ impl Connection {
     pub async fn stats(&mut self) -> Result<Stats> {
         let raw = self
             .0
-            .read_holding_registers(0x0, 80)
+            .read_holding_registers(0x0, 81)
             .await
             .context("stats failed to read holding registers")?;
-        if raw.len() != 80 {
+        if raw.len() != 81 {
             bail!("stats wrong number of registers read {} expected 80", raw.len())
         }
         Ok(Stats {
@@ -724,7 +724,7 @@ impl Connection {
             ),
             array_power: w(gf32(raw[0x003C])),
             array_vmp: v(gf32(raw[0x003D])),
-            array_max_power_sweep: v(gf32(raw[0x003E])),
+            array_max_power_sweep: w(gf32(raw[0x003E])),
             array_voc: v(gf32(raw[0x003F])),
             battery_v_min_daily: v(gf32(raw[0x0041])),
             battery_v_max_daily: v(gf32(raw[0x0042])),
@@ -742,7 +742,7 @@ impl Connection {
     }
 
     pub async fn read_settings(&mut self) -> Result<Settings> {
-        let len = (SETTINGS_END - SETTINGS_BASE) as u16;
+        let len = ((SETTINGS_END - SETTINGS_BASE) + 1) as u16;
         let raw = self
             .0
             .read_holding_registers(SETTINGS_BASE as u16, len)
