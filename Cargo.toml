@@ -17,7 +17,7 @@ tokio-modbus = { version = "0.4", default-features = false, features = ["rtu"] }
 tokio = { version = "0.2", features = ["rt-core"] }
 bitflags = "1.2"
 half = "1.6"
-uom = { version = "0.28", features = ["use_serde", "f32", "f64", "si", "std"] }
+uom = { version = "0.31", features = ["use_serde", "f32", "f64", "si", "std"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
