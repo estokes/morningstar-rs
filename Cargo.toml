@@ -1,6 +1,6 @@
 [package]
 name = "morningstar"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Eric Stokes"]
 description = "A small library to control Morningstar solar charge controllers"
 categories = ["hardware-support"]
@@ -12,10 +12,10 @@ edition = "2018"
 
 [dependencies]
 futures = "0.3"
-tokio-serial = "4.3"
-tokio-modbus = { version = "0.4", default-features = false, features = ["rtu"] }
-tokio = { version = "0.2", features = ["rt-core"] }
-bitflags = "1.2"
+tokio-serial = "5"
+tokio-modbus = { version = "0.5", default-features = false, features = ["rtu"] }
+tokio = { version = "1", features = ["rt"] }
+bitflags = "1.3"
 half = "1.6"
 uom = { version = "0.31", features = ["use_serde", "f32", "f64", "si", "std"] }
 chrono = { version = "0.4", features = ["serde"] }

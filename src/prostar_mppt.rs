@@ -22,7 +22,7 @@ use chrono::prelude::*;
 use half::f16;
 use std::{fmt, mem::transmute, thread::sleep, time::Duration};
 use tokio_modbus::{client::Context as Modbus, prelude::*};
-use tokio_serial::{DataBits, FlowControl, Parity, Serial, SerialPortSettings, StopBits};
+use tokio_serial::{self, DataBits, FlowControl, Parity, SerialStream, StopBits};
 use uom::si::{
     electric_charge::ampere_hour,
     electric_current::ampere,
@@ -638,16 +638,15 @@ pub struct Connection(Modbus);
 
 impl Connection {
     pub async fn new(device: &str, modbus_id: u8) -> Result<Connection> {
-        let settings = SerialPortSettings {
-            baud_rate: 9600,
-            data_bits: DataBits::Eight,
-            flow_control: FlowControl::None,
-            parity: Parity::None,
-            stop_bits: StopBits::Two,
-            timeout: Duration::from_secs(10),
-        };
-        let port = Serial::from_path(device, &settings)
-            .context("failed to connect to serial port")?;
+        let port = SerialStream::open(
+            &tokio_serial::new(device, 9600)
+                .data_bits(DataBits::Eight)
+                .flow_control(FlowControl::None)
+                .parity(Parity::None)
+                .stop_bits(StopBits::Two)
+                .timeout(Duration::from_secs(10)),
+        )
+        .context("failed to connect to serial port")?;
         let con = rtu::connect_slave(port, Slave(modbus_id))
             .await
             .context("failed to build modbus context")?;
